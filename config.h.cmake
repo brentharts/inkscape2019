@@ -27,7 +27,7 @@
 #cmakedefine HAVE_LIBLCMS2 1
 
 /* always defined to indicate that i18n is enabled */
-#cmakedefine ENABLE_NLS 1
+//#cmakedefine ENABLE_NLS 1
 
 /* Build with OSX .app data dir paths? */
 #cmakedefine ENABLE_OSX_APP_LOCATIONS 1
@@ -54,10 +54,10 @@
 #cmakedefine HAVE_ASPELL 1
 
 /* Use libpoppler for direct PDF import */
-#cmakedefine HAVE_POPPLER 1
+//#cmakedefine HAVE_POPPLER 1
 
 /* Use libpoppler-cairo for rendering PDF preview */
-#cmakedefine HAVE_POPPLER_CAIRO 1
+//#cmakedefine HAVE_POPPLER_CAIRO 1
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #cmakedefine HAVE_STDINT_H 1
