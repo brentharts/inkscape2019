@@ -143,9 +143,9 @@ endif()
 # -----------------------------------------------------------------------------
 add_subdirectory(src)
 
-if(ENABLE_NLS)
-    add_subdirectory(po)
-endif(ENABLE_NLS)
+#if(ENABLE_NLS)
+#    add_subdirectory(po)
+#endif(ENABLE_NLS)
 
 if(NOT WIN32)
     include(CMakeScripts/Pod2man.cmake)
