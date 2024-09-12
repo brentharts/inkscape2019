@@ -19,7 +19,7 @@
 #include <glibmm/convert.h>
 #include <glibmm/ustring.h>
 #include <glibmm/miscutils.h>
-
+#include <libxml/xmlmemory.h>
 #include "bad-uri-exception.h"
 
 namespace Inkscape {
