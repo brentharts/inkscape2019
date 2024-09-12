@@ -15,10 +15,7 @@
 # include "config.h"  // only include where actually required!
 #endif
 
-#if HAVE_STDINT_H
-# include <cstdint>
-#endif
-
+#include <cstdint>
 #include <vector>
 #include <string>
 
