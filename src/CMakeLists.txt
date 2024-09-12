@@ -343,14 +343,9 @@ add_executable(inkscape ${main_SRC})
 add_executable(inkview ${view_SRC})
 
 
-
+if(USE_AUTOTRACE)
 set(INKSCAPE_TARGET_LIBS
-        # order from automake
-        #sp_LIB
-        #nrtype_LIB
-        #inkscape_LIB
-        #sp_LIB # annoying, we need both!
-        nrtype_LIB # annoying, we need both!
+        nrtype_LIB
         croco_LIB
         avoid_LIB
         cola_LIB
@@ -363,6 +358,22 @@ set(INKSCAPE_TARGET_LIBS
         util_LIB
         gc_LIB
 )
+else()
+set(INKSCAPE_TARGET_LIBS
+        nrtype_LIB
+        croco_LIB
+        avoid_LIB
+        cola_LIB
+        vpsc_LIB
+        livarot_LIB
+        uemf_LIB
+        2geom_LIB
+        depixelize_LIB
+        util_LIB
+        gc_LIB
+)
+
+endif()
 
 # Build everything except main and inkview.c in a shared library.
 add_library(inkscape_base ${inkscape_SRC} ${sp_SRC})
