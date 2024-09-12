@@ -39,6 +39,12 @@
 #include <2geom/solver.h>
 #include <2geom/concepts.h>
 
+// Workaround for GCC null-analyser false positives.
+// See https://gitlab.com/inkscape/lib2geom/-/issues/64
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic ignored "-Wnonnull"
+#endif
+
 namespace Geom {
 
 std::vector<Coord> Bezier::valueAndDerivatives(Coord t, unsigned n_derivs) const {
