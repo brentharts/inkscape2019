@@ -9,6 +9,11 @@
  * Released under GNU GPL v2+, read the file 'COPYING' for more information.
  */
 
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic ignored "-Wnonnull"
+#endif
+
+
 #include "effect.h"
 
 #include "execution-env.h"
