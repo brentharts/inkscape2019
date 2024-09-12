@@ -389,7 +389,8 @@ target_link_libraries(inkscape_base PRIVATE ${INKSCAPE_TARGET_LIBS} PUBLIC ${INK
 target_link_libraries(inkscape inkscape_base)
 target_link_libraries(inkview inkscape_base)
 
-
+add_library(libinkscape ${main_SRC})
+target_link_libraries(libinkscape inkscape_base)
 
 #Define the installation
 install(TARGETS inkscape inkview RUNTIME DESTINATION bin)
