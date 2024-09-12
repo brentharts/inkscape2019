@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, sys, subprocess, xml.dom.minidom
+import os, sys, subprocess, xml.dom.minidom, ctypes
 
 if '--install' in sys.argv:
 	#if 'fedora' in os.uname().nodename:  ## this breaks when connected to internet DHCP :(
@@ -17,7 +17,7 @@ if not os.path.isdir(_buildir):
 	os.mkdir(_buildir)
 
 INKSCAPE_EXE = os.path.join(_buildir,'bin/inkscape')
-
+INKSCAPE_SO  = os.path.join(_buildir,'lib/libinkscape_base.so')
 
 ## from inkscape 1.3.2 2023/11/25
 SP_MARSHAL_LIST = '''
@@ -36,7 +36,7 @@ VOID:STRING,STRING
 def build():
 	_helpers = os.path.join(_thisdir,'src/helper')
 	open( os.path.join(_helpers, 'sp-marshal.list'), 'w').write(SP_MARSHAL_LIST)
-	cmd = ['cmake', os.path.abspath(_thisdir), '-DENABLE_POPPLER=0', '-DENABLE_POPPLER_CAIRO=0']
+	cmd = ['cmake', os.path.abspath(_thisdir), '-DENABLE_POPPLER=0', '-DENABLE_POPPLER_CAIRO=0', '-DUSE_TRACE=1', '-DUSE_AUTOTRACE=1']
 	print(cmd)
 	subprocess.check_call(cmd, cwd=_buildir)
 	subprocess.check_call(['make'], cwd=_buildir)
@@ -67,12 +67,20 @@ def ensure_user_config( minimal=True ):
 	else:
 		open(os.path.join(iui, 'toolbar-tool.ui'), 'w').write(open('./share/ui/toolbar-tool.ui').read())
 
+
+def inkscape_python():
+	lib = ctypes.CDLL(INKSCAPE_SO)
+	print(lib)
+
 if __name__=='__main__':
-	if not os.path.isfile(INKSCAPE_EXE):
+	if not os.path.isfile(INKSCAPE_EXE) or '--rebuild' in sys.argv:
 		build()
 	if not os.path.isdir('/usr/local/share/inkscape'):
 		os.system('sudo mkdir /usr/local/share/inkscape')
 		os.system('sudo cp -Rv ./share/pixmaps /usr/local/share/inkscape/.')
 
 	ensure_user_config()
-	subprocess.check_call([INKSCAPE_EXE])
+	if '--exe' in sys.argv:
+		subprocess.check_call([INKSCAPE_EXE])
+	else:
+		inkscape_python()
