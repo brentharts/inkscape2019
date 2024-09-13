@@ -141,23 +141,27 @@ def inkscape_python():
 		'-I/usr/include/glibmm-2.4', 
 		'-I/usr/include/sigc++-2.0/', 
 	]
+	if os.path.isdir('/usr/lib/x86_64-linux-gnu'):
+		sdir = '/usr/lib/x86_64-linux-gnu' ## debian based
+	else:
+		sdir = '/usr/lib64'  ## fedora based
 	cmd += [
 		#'-I/usr/lib/x86_64-linux-gnu/glibmm-2.68/include', 
-		'-I/usr/lib/x86_64-linux-gnu/glibmm-2.4/include', 
-		'-I/usr/lib/x86_64-linux-gnu/glib-2.0/include',
-		'-I/usr/lib/x86_64-linux-gnu/sigc++-2.0/include',
-		'-I/usr/lib/x86_64-linux-gnu/giomm-2.4/include',
+		'-I%s/glibmm-2.4/include' % sdir, 
+		'-I%s/glib-2.0/include' % sdir,
+		'-I%s/sigc++-2.0/include' % sdir,
+		'-I%s/giomm-2.4/include' % sdir,
 
 		#'-I/usr/lib/x86_64-linux-gnu/gdkmm-2.4/include',
-		'-I/usr/lib/x86_64-linux-gnu/gdkmm-3.0/include',
+		'-I%s/gdkmm-3.0/include' % sdir,
 
-		'-I/usr/lib/x86_64-linux-gnu/pangomm-1.4/include',
+		'-I%s/pangomm-1.4/include' % sdir,
 
-		'-I/usr/lib/x86_64-linux-gnu/cairomm-1.0/include',
+		'-I%s/cairomm-1.0/include' % sdir,
 		#'-I/usr/lib/x86_64-linux-gnu/cairomm-1.16/include',
 
-		'-I/usr/lib/x86_64-linux-gnu/gtkmm-3.0/include',
-		'-I/usr/lib/x86_64-linux-gnu/atkmm-1.6/include',
+		'-I%s/gtkmm-3.0/include' % sdir,
+		'-I%s/atkmm-1.6/include' % sdir,
 		]
 	print(cmd)
 	subprocess.check_call(cmd)
