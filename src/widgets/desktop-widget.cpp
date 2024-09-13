@@ -357,7 +357,21 @@ void SPDesktopWidget::init( SPDesktopWidget *dtw )
 
     dtw->tool_toolbox = ToolboxFactory::createToolToolbox();
     ToolboxFactory::setOrientation( dtw->tool_toolbox, GTK_ORIENTATION_VERTICAL );
-    dtw->_hbox->pack_start(*Glib::wrap(dtw->tool_toolbox), false, true);
+    #ifdef INKSCAPE_OLD
+        dtw->_hbox->pack_start(*Glib::wrap(dtw->tool_toolbox), false, true);
+    #else
+        //auto split = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+        auto grid = gtk_grid_new();
+        //auto btn = gtk_widget_new(GTK_TYPE_BUTTON, "hi");//new Gtk::Button();
+        auto btn = gtk_button_new_with_label("hi");
+        //btn->set_label("hello");
+        //split->pack_start(*btn);
+        //split->pack_start(*Glib::wrap(dtw->tool_toolbox), false, true);
+        gtk_grid_attach(GTK_GRID(grid), btn, 0, 0, 1, 1);
+        gtk_grid_attach(GTK_GRID(grid), dtw->tool_toolbox, 0, 1, 1, 1);
+        dtw->_hbox->pack_start(*Glib::wrap(grid), false, true);
+        //g_signal_connect(btn, "clicked", G_CALLBACK(TODO), NULL);
+    #endif
 
     /* Canvas table wrapper */
     auto tbl_wrapper = Gtk::manage(new Gtk::Grid()); // Is this widget really needed? No!
