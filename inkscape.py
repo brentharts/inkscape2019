@@ -83,27 +83,69 @@ INKSCAPE_MODULE = '''
 #include "inkscape-application.h"
 #include "inkscape.h"             // Inkscape::Application
 
+ConcreteInkscapeApplication<Gtk::Application> *app;
+InkscapeWindow *win;
+SPDocument *doc;
+
+extern "C" int inkscape_init(){
+	std::cout << "inkscape_init()" << std::endl;
+	app = ConcreteInkscapeApplication<Gtk::Application>::get_instance_pointer();
+	std::cout << app << std::endl;
+	return 1;
+}
+extern "C" int inkscape_window_open(){
+	std::cout << "new SPDoc" << std::endl;
+	doc = new SPDocument();
+	std::cout << doc << std::endl;
+	app->document_add(doc);
+	win = app->window_open(doc);
+	std::cout << "window_open OK" << std::endl;
+}
+
+'''
+
+## TODO
+INKSCAPE_MODULE_LOW_LEVEL = '''
 class InkscapeModule : public InkscapeApplication {
 	public:
 	InkscapeModule(){};
-	virtual void on_startup() override {};
-	virtual void on_startup2() override {};
-	virtual InkFileExportCmd* file_export() override {};
-	virtual int  on_handle_local_options(const Glib::RefPtr<Glib::VariantDict>& options) override {};
-	virtual void on_new() override {};
-	virtual void on_quit()  override {};
+	virtual void on_startup() override {
+		std::cout << "on_startup()" << std::endl;
+
+	};
+	virtual void on_startup2() override {
+		std::cout << "on_startup2()" << std::endl;
+
+	};
+	virtual InkFileExportCmd* file_export() override {
+		std::cout << "file_export()" << std::endl;
+	};
+	virtual int  on_handle_local_options(const Glib::RefPtr<Glib::VariantDict>& options) override {
+		std::cout << "on_handle_local_options()" << std::endl;
+
+	};
+	virtual void on_new() override {
+		std::cout << "on_new()" << std::endl;
+	};
+	virtual void on_quit()  override {
+		std::cout << "on_quit()" << std::endl;
+	};
 };
 
 InkscapeModule *app;
 InkscapeWindow *win;
 SPDocument *doc;
 
-extern "C" int inkscape_init(){
+extern "C" int inkscape_init_lowlevel(){
 	bool with_gui=true;
 	if (gtk_init_check(NULL, NULL)){
+		std::cout << "GC::init()" << std::endl;
 		Inkscape::GC::init();
+		std::cout << "Inkscape::Application::create" << std::endl;
 		Inkscape::Application::create(with_gui);
+		std::cout << "new SPDoc" << std::endl;
 		doc = new SPDocument();
+		std::cout << "new InkscapeModule" << std::endl;
 		app = new InkscapeModule();
 		std::cout << app << std::endl;
 		win = app->window_open(doc);
@@ -115,18 +157,6 @@ extern "C" int inkscape_init(){
 }
 
 '''
-
-#libgtkmm-3.0.so.1 => /lib/x86_64-linux-gnu/libgtkmm-3.0.so.1 (0x00007f1ce5a00000)
-#libatkmm-1.6.so.1 => /lib/x86_64-linux-gnu/libatkmm-1.6.so.1 (0x00007f1ce638d000)
-#libgdkmm-3.0.so.1 => /lib/x86_64-linux-gnu/libgdkmm-3.0.so.1 (0x00007f1ce6332000)
-#libgiomm-2.4.so.1 => /lib/x86_64-linux-gnu/libgiomm-2.4.so.1 (0x00007f1ce582e000)
-#libpangomm-1.4.so.1 => /lib/x86_64-linux-gnu/libpangomm-1.4.so.1 (0x00007f1ce62ff000)
-#libglibmm-2.4.so.1 => /lib/x86_64-linux-gnu/libglibmm-2.4.so.1 (0x00007f1ce6276000)
-#libcairomm-1.0.so.1 => /lib/x86_64-linux-gnu/libcairomm-1.0.so.1 (0x00007f1ce5fd5000)
-#libpangocairo-1.0.so.0 => /lib/x86_64-linux-gnu/libpangocairo-1.0.so.0 (0x00007f99c55e9000)
-#libpangoft2-1.0.so.0 => /lib/x86_64-linux-gnu/libpangoft2-1.0.so.0 (0x00007f99c3aa0000)
-#libpango-1.0.so.0 => /lib/x86_64-linux-gnu/libpango-1.0.so.0 (0x00007f99c3a35000)
-#libpangomm-1.4.so.1 => /lib/x86_64-linux-gnu/libpangomm-1.4.so.1 (0x00007f99c2f49000)
 
 
 def inkscape_python():
@@ -188,11 +218,15 @@ def inkscape_python():
 		]
 	print(cmd)
 	subprocess.check_call(cmd)
+	print('loading:', INKSCAPE_SO)
 	libase = ctypes.CDLL(INKSCAPE_SO)  ## must be loaded first
+	print(libase)
+	print('loading:', so)
 	lib = ctypes.CDLL(so)
 	print(lib)
 	print(lib.inkscape_init)
 	lib.inkscape_init()
+	lib.inkscape_window_open()
 
 if __name__=='__main__':
 	if not os.path.isfile(INKSCAPE_EXE) or '--rebuild' in sys.argv:
