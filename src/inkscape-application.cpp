@@ -448,6 +448,12 @@ InkscapeApplication::dump()
     }
 }
 
+template<class T>
+ConcreteInkscapeApplication<T>*
+ConcreteInkscapeApplication<T>::get_instance_pointer() {
+    static ConcreteInkscapeApplication<T> *__instance__ = new ConcreteInkscapeApplication<T>();
+    return __instance__;
+}
 
 template<class T>
 ConcreteInkscapeApplication<T>&
