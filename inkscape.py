@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, sys, subprocess, xml.dom.minidom, ctypes
+import os, sys, subprocess, xml.dom.minidom, ctypes, atexit
 
 if '--install' in sys.argv:
 	#if 'fedora' in os.uname().nodename:  ## this breaks when connected to internet DHCP :(
@@ -55,7 +55,7 @@ def gen_min_toolbar_ui():
 	return ui.toprettyxml()
 
 
-def ensure_user_config( minimal=True ):
+def ensure_user_config( minimal=True, menu=True ):
 	cfg = os.path.expanduser('~/.config')
 	assert os.path.isdir(cfg)
 	icfg = os.path.join(cfg, 'inkscape')
@@ -66,6 +66,18 @@ def ensure_user_config( minimal=True ):
 		open(os.path.join(iui, 'toolbar-tool.ui'), 'w').write(gen_min_toolbar_ui())
 	else:
 		open(os.path.join(iui, 'toolbar-tool.ui'), 'w').write(open('./share/ui/toolbar-tool.ui').read())
+
+	if menu:
+		open(os.path.join(iui, 'menus.xml'), 'w').write(open('./share/ui/menus.xml').read())
+
+	def cleanup():
+		## this is required so that OS packaged inkscape is able to run
+		## otherwise it will read these config files and crash
+		os.unlink(os.path.join(iui, 'menus.xml'))
+		os.unlink(os.path.join(iui, 'toolbar-tool.ui'))
+
+	atexit.register(cleanup)
+
 
 INKSCAPE_MODULE = '''
 #include "inkscape-application.h"
@@ -92,18 +104,6 @@ extern "C" int inkscape_init(){
 	}
 }
 '''
-
-#libgtkmm-3.0.so.1 => /lib/x86_64-linux-gnu/libgtkmm-3.0.so.1 (0x00007f1ce5a00000)
-#libatkmm-1.6.so.1 => /lib/x86_64-linux-gnu/libatkmm-1.6.so.1 (0x00007f1ce638d000)
-#libgdkmm-3.0.so.1 => /lib/x86_64-linux-gnu/libgdkmm-3.0.so.1 (0x00007f1ce6332000)
-#libgiomm-2.4.so.1 => /lib/x86_64-linux-gnu/libgiomm-2.4.so.1 (0x00007f1ce582e000)
-#libpangomm-1.4.so.1 => /lib/x86_64-linux-gnu/libpangomm-1.4.so.1 (0x00007f1ce62ff000)
-#libglibmm-2.4.so.1 => /lib/x86_64-linux-gnu/libglibmm-2.4.so.1 (0x00007f1ce6276000)
-#libcairomm-1.0.so.1 => /lib/x86_64-linux-gnu/libcairomm-1.0.so.1 (0x00007f1ce5fd5000)
-#libpangocairo-1.0.so.0 => /lib/x86_64-linux-gnu/libpangocairo-1.0.so.0 (0x00007f99c55e9000)
-#libpangoft2-1.0.so.0 => /lib/x86_64-linux-gnu/libpangoft2-1.0.so.0 (0x00007f99c3aa0000)
-#libpango-1.0.so.0 => /lib/x86_64-linux-gnu/libpango-1.0.so.0 (0x00007f99c3a35000)
-#libpangomm-1.4.so.1 => /lib/x86_64-linux-gnu/libpangomm-1.4.so.1 (0x00007f99c2f49000)
 
 
 def inkscape_python():
