@@ -78,6 +78,7 @@ def ensure_user_config( minimal=True, menu=True ):
 
 	atexit.register(cleanup)
 
+#SPDocument *SPDocument::createNewDoc(gchar const *document_uri, bool keepalive, bool make_new, SPDocument *parent)
 
 INKSCAPE_MODULE = '''
 #include "inkscape-application.h"
@@ -87,21 +88,28 @@ ConcreteInkscapeApplication<Gtk::Application> *app;
 InkscapeWindow *win;
 SPDocument *doc;
 
-extern "C" int inkscape_init(){
+extern "C" void inkscape_init(){
 	std::cout << "inkscape_init()" << std::endl;
-	app = ConcreteInkscapeApplication<Gtk::Application>::get_instance_pointer();
+	//app = ConcreteInkscapeApplication<Gtk::Application>::get_instance_pointer();
+	app = &(ConcreteInkscapeApplication<Gtk::Application>::get_instance());
 	std::cout << app << std::endl;
-	return 1;
+	Inkscape::Application::create(true);
 }
-extern "C" int inkscape_window_open(){
+extern "C" void inkscape_window_open(){
 	std::cout << "new SPDoc" << std::endl;
-	doc = new SPDocument();
+	//doc = new SPDocument();
+	doc = SPDocument::createNewDoc(nullptr, true, true, nullptr);
 	std::cout << doc << std::endl;
 	app->document_add(doc);
+	std::cout << "window_open" << std::endl;
 	win = app->window_open(doc);
 	std::cout << "window_open OK" << std::endl;
 }
 
+
+extern "C" void inkscape_gtk_update(){
+	while (gtk_events_pending()) gtk_main_iteration();
+}
 '''
 
 ## TODO
@@ -226,7 +234,10 @@ def inkscape_python():
 	print(lib)
 	print(lib.inkscape_init)
 	lib.inkscape_init()
+	lib.inkscape_gtk_update()
 	lib.inkscape_window_open()
+	while True:
+		lib.inkscape_gtk_update()
 
 if __name__=='__main__':
 	if not os.path.isfile(INKSCAPE_EXE) or '--rebuild' in sys.argv:
