@@ -71,13 +71,14 @@ INKSCAPE_MODULE = '''
 #include "inkscape-application.h"
 
 class InkscapeModule : public InkscapeApplication {
-	virtual void on_startup() override;
-	virtual void on_startup2() override;
-	virtual InkFileExportCmd* file_export() override;
-	virtual int  on_handle_local_options(const Glib::RefPtr<Glib::VariantDict>& options) override;
-	virtual void on_new() override;
-	virtual void on_quit()  override;
-
+	public:
+	InkscapeModule(){};
+	virtual void on_startup() override {};
+	virtual void on_startup2() override {};
+	virtual InkFileExportCmd* file_export() override {};
+	virtual int  on_handle_local_options(const Glib::RefPtr<Glib::VariantDict>& options) override {};
+	virtual void on_new() override {};
+	virtual void on_quit()  override {};
 };
 
 InkscapeModule *app;
@@ -110,7 +111,13 @@ def inkscape_python():
 	tmp = '/tmp/libinkscape.c++'
 	open(tmp,'w').write(INKSCAPE_MODULE)
 	cmd = [
-		'g++', '-o', so, tmp, '-l', INKSCAPE_SO, 
+		'g++', 
+		'-shared', '-fPIC',
+		'-o', so, tmp, 
+		'-L', os.path.join(_buildir,'lib'),
+		'-l', 'inkscape_base',   ## this is actually: libinkscape_base.so
+		'-l', 'gtk-3',
+
 		'-I./src/include', '-I./src', '-I/usr/include/glib-2.0',
 		#'-I/usr/include/giomm-2.68', ## gtk4
 		'-I/usr/include/giomm-2.4', ## gtk3
@@ -154,8 +161,10 @@ def inkscape_python():
 		]
 	print(cmd)
 	subprocess.check_call(cmd)
+	libase = ctypes.CDLL(INKSCAPE_SO)  ## must be loaded first
 	lib = ctypes.CDLL(so)
 	print(lib)
+	print(lib.inkscape_init)
 
 if __name__=='__main__':
 	if not os.path.isfile(INKSCAPE_EXE) or '--rebuild' in sys.argv:
