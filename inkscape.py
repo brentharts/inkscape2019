@@ -69,17 +69,41 @@ def ensure_user_config( minimal=True ):
 
 INKSCAPE_MODULE = '''
 #include "inkscape-application.h"
-InkscapeApplication *app
+
+class InkscapeModule : public InkscapeApplication {
+	virtual void on_startup() override;
+	virtual void on_startup2() override;
+	virtual InkFileExportCmd* file_export() override;
+	virtual int  on_handle_local_options(const Glib::RefPtr<Glib::VariantDict>& options) override;
+	virtual void on_new() override;
+	virtual void on_quit()  override;
+
+};
+
+InkscapeModule *app;
 
 extern "C" int inkscape_init(){
 	if (gtk_init_check(NULL, NULL)){
-		app = new InkscapeApplication();
+		app = new InkscapeModule();
 		return 1;
 	} else {
 		return 0;
 	}
 }
 '''
+
+#libgtkmm-3.0.so.1 => /lib/x86_64-linux-gnu/libgtkmm-3.0.so.1 (0x00007f1ce5a00000)
+#libatkmm-1.6.so.1 => /lib/x86_64-linux-gnu/libatkmm-1.6.so.1 (0x00007f1ce638d000)
+#libgdkmm-3.0.so.1 => /lib/x86_64-linux-gnu/libgdkmm-3.0.so.1 (0x00007f1ce6332000)
+#libgiomm-2.4.so.1 => /lib/x86_64-linux-gnu/libgiomm-2.4.so.1 (0x00007f1ce582e000)
+#libpangomm-1.4.so.1 => /lib/x86_64-linux-gnu/libpangomm-1.4.so.1 (0x00007f1ce62ff000)
+#libglibmm-2.4.so.1 => /lib/x86_64-linux-gnu/libglibmm-2.4.so.1 (0x00007f1ce6276000)
+#libcairomm-1.0.so.1 => /lib/x86_64-linux-gnu/libcairomm-1.0.so.1 (0x00007f1ce5fd5000)
+#libpangocairo-1.0.so.0 => /lib/x86_64-linux-gnu/libpangocairo-1.0.so.0 (0x00007f99c55e9000)
+#libpangoft2-1.0.so.0 => /lib/x86_64-linux-gnu/libpangoft2-1.0.so.0 (0x00007f99c3aa0000)
+#libpango-1.0.so.0 => /lib/x86_64-linux-gnu/libpango-1.0.so.0 (0x00007f99c3a35000)
+#libpangomm-1.4.so.1 => /lib/x86_64-linux-gnu/libpangomm-1.4.so.1 (0x00007f99c2f49000)
+
 
 def inkscape_python():
 	so  = '/tmp/libinkscape.so'
@@ -88,28 +112,43 @@ def inkscape_python():
 	cmd = [
 		'g++', '-o', so, tmp, '-l', INKSCAPE_SO, 
 		'-I./src/include', '-I./src', '-I/usr/include/glib-2.0',
-		'-I/usr/include/giomm-2.4', 
+		#'-I/usr/include/giomm-2.68', ## gtk4
+		'-I/usr/include/giomm-2.4', ## gtk3
 		#'-I/usr/include/gdkmm-2.4',
 		'-I/usr/include/gdkmm-3.0',
-		'-I/usr/include/pangomm-2.48', '-I/usr/include/pango-1.0',
-		'-I/usr/include/harfbuzz', '-I/usr/include/cairomm-1.16',
-		'-I/usr/include/cairo', '-I/usr/include/freetype2',
+		#'-I/usr/include/pangomm-2.48', ## gtk4
+		'-I/usr/include/pangomm-1.4', ## gtk3
+		'-I/usr/include/pango-1.0',
+		'-I/usr/include/harfbuzz', 
+		#'-I/usr/include/cairomm-1.16',  ## gtk4?
+		'-I/usr/include/cairomm-1.0',
+		'-I/usr/include/cairo', 
+		'-I/usr/include/freetype2',
 		'-I/usr/include/gtk-3.0',
 		'-I/usr/include/gdk-pixbuf-2.0',
 		'-I/usr/include/atkmm-1.6',
 		'-I/usr/include/atk-1.0',
+		'-I/usr/include/gtkmm-3.0/', 
+		#'-I/usr/include/gtkmm-2.4/', ## old gtk2
+		#'-I/usr/include/glibmm-2.68', 
+		'-I/usr/include/glibmm-2.4', 
+		'-I/usr/include/sigc++-2.0/', 
 	]
 	cmd += [
-		'-I/usr/include/gtkmm-3.0/', '-I/usr/include/glibmm-2.4', 
-		'-I/usr/lib/x86_64-linux-gnu/glibmm-2.4/include', '-I/usr/lib/x86_64-linux-gnu/glib-2.0/include',
-		'-I/usr/include/sigc++-2.0/', '-I/usr/lib/x86_64-linux-gnu/sigc++-2.0/include',
+		#'-I/usr/lib/x86_64-linux-gnu/glibmm-2.68/include', 
+		'-I/usr/lib/x86_64-linux-gnu/glibmm-2.4/include', 
+		'-I/usr/lib/x86_64-linux-gnu/glib-2.0/include',
+		'-I/usr/lib/x86_64-linux-gnu/sigc++-2.0/include',
 		'-I/usr/lib/x86_64-linux-gnu/giomm-2.4/include',
 
 		#'-I/usr/lib/x86_64-linux-gnu/gdkmm-2.4/include',
 		'-I/usr/lib/x86_64-linux-gnu/gdkmm-3.0/include',
 
-		'-I/usr/lib/x86_64-linux-gnu/pangomm-2.48/include',
-		'-I/usr/lib/x86_64-linux-gnu/cairomm-1.16/include',
+		'-I/usr/lib/x86_64-linux-gnu/pangomm-1.4/include',
+
+		'-I/usr/lib/x86_64-linux-gnu/cairomm-1.0/include',
+		#'-I/usr/lib/x86_64-linux-gnu/cairomm-1.16/include',
+
 		'-I/usr/lib/x86_64-linux-gnu/gtkmm-3.0/include',
 		'-I/usr/lib/x86_64-linux-gnu/atkmm-1.6/include',
 		]
