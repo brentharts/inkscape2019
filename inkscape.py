@@ -81,6 +81,7 @@ def ensure_user_config( minimal=True, menu=True ):
 
 INKSCAPE_MODULE = '''
 #include "inkscape-application.h"
+#include "inkscape.h"             // Inkscape::Application
 
 class InkscapeModule : public InkscapeApplication {
 	public:
@@ -94,16 +95,38 @@ class InkscapeModule : public InkscapeApplication {
 };
 
 InkscapeModule *app;
+InkscapeWindow *win;
+SPDocument *doc;
 
 extern "C" int inkscape_init(){
+	bool with_gui=true;
 	if (gtk_init_check(NULL, NULL)){
+		Inkscape::GC::init();
+		Inkscape::Application::create(with_gui);
+		doc = new SPDocument();
 		app = new InkscapeModule();
+		std::cout << app << std::endl;
+		win = app->window_open(doc);
+		std::cout << "window_open OK" << std::endl;
 		return 1;
 	} else {
 		return 0;
 	}
 }
+
 '''
+
+#libgtkmm-3.0.so.1 => /lib/x86_64-linux-gnu/libgtkmm-3.0.so.1 (0x00007f1ce5a00000)
+#libatkmm-1.6.so.1 => /lib/x86_64-linux-gnu/libatkmm-1.6.so.1 (0x00007f1ce638d000)
+#libgdkmm-3.0.so.1 => /lib/x86_64-linux-gnu/libgdkmm-3.0.so.1 (0x00007f1ce6332000)
+#libgiomm-2.4.so.1 => /lib/x86_64-linux-gnu/libgiomm-2.4.so.1 (0x00007f1ce582e000)
+#libpangomm-1.4.so.1 => /lib/x86_64-linux-gnu/libpangomm-1.4.so.1 (0x00007f1ce62ff000)
+#libglibmm-2.4.so.1 => /lib/x86_64-linux-gnu/libglibmm-2.4.so.1 (0x00007f1ce6276000)
+#libcairomm-1.0.so.1 => /lib/x86_64-linux-gnu/libcairomm-1.0.so.1 (0x00007f1ce5fd5000)
+#libpangocairo-1.0.so.0 => /lib/x86_64-linux-gnu/libpangocairo-1.0.so.0 (0x00007f99c55e9000)
+#libpangoft2-1.0.so.0 => /lib/x86_64-linux-gnu/libpangoft2-1.0.so.0 (0x00007f99c3aa0000)
+#libpango-1.0.so.0 => /lib/x86_64-linux-gnu/libpango-1.0.so.0 (0x00007f99c3a35000)
+#libpangomm-1.4.so.1 => /lib/x86_64-linux-gnu/libpangomm-1.4.so.1 (0x00007f99c2f49000)
 
 
 def inkscape_python():
@@ -169,6 +192,7 @@ def inkscape_python():
 	lib = ctypes.CDLL(so)
 	print(lib)
 	print(lib.inkscape_init)
+	lib.inkscape_init()
 
 if __name__=='__main__':
 	if not os.path.isfile(INKSCAPE_EXE) or '--rebuild' in sys.argv:
