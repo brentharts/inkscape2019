@@ -121,6 +121,7 @@ template <class T> class ConcreteInkscapeApplication : public T, public Inkscape
 {
 public:
     static ConcreteInkscapeApplication<T>& get_instance();
+    static ConcreteInkscapeApplication<T>* get_instance_pointer();
 
 private:
     ConcreteInkscapeApplication();
