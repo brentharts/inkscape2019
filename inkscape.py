@@ -34,6 +34,8 @@ VOID:STRING,STRING
 '''
 
 def build():
+	open('/tmp/__inkscape__.toolbar.inc','w').write(INKSCAPE_TOOLBAR)
+	open('/tmp/__inkscape__.header.inc','w').write(INKSCAPE_HEADER)
 	_helpers = os.path.join(_thisdir,'src/helper')
 	open( os.path.join(_helpers, 'sp-marshal.list'), 'w').write(SP_MARSHAL_LIST)
 	cmd = ['cmake', os.path.abspath(_thisdir), '-DENABLE_POPPLER=0', '-DENABLE_POPPLER_CAIRO=0', '-DUSE_TRACE=1', '-DUSE_AUTOTRACE=1']
@@ -47,7 +49,9 @@ def gen_min_toolbar_ui():
 	tb = doc.createElement('toolbar')
 	tb.setAttribute('name', 'ToolToolbar')
 	ui.appendChild(tb)
-	for act in 'ToolSelector ToolNode ToolRect ToolArc ToolPencil ToolPen ToolCalligraphic ToolText ToolEraser ToolPaintBucket'.split():
+	tools = 'ToolSelector ToolNode ToolRect ToolArc ToolPencil ToolPen ToolCalligraphic ToolText ToolEraser ToolPaintBucket'.split()
+	#tools.append('PythonScript')  ## rather than hook into inkscape actions api, we can just generate simple C++ .inc files
+	for act in tools:
 		a = doc.createElement('toolitem')
 		tb.appendChild(a)
 		a.setAttribute('action', act)
@@ -77,6 +81,29 @@ def ensure_user_config( minimal=True, menu=True ):
 		os.unlink(os.path.join(iui, 'toolbar-tool.ui'))
 
 	atexit.register(cleanup)
+
+INKSCAPE_HEADER = '''
+static void test_button(GtkWidget *widget, gpointer   data) {
+  std::cout << "clicked OK" << std::endl;
+}
+
+'''
+
+INKSCAPE_TOOLBAR = '''
+        //auto split = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+        auto grid = gtk_grid_new();
+        //auto btn = gtk_widget_new(GTK_TYPE_BUTTON, "hi");//new Gtk::Button();
+        auto btn = gtk_button_new_with_label("hi");
+        //btn->set_label("hello");
+        //split->pack_start(*btn);
+        //split->pack_start(*Glib::wrap(dtw->tool_toolbox), false, true);
+        gtk_grid_attach(GTK_GRID(grid), btn, 0, 0, 1, 1);
+        gtk_grid_attach(GTK_GRID(grid), dtw->tool_toolbox, 0, 1, 1, 1);
+        dtw->_hbox->pack_start(*Glib::wrap(grid), false, true);
+        g_signal_connect(btn, "clicked", G_CALLBACK(test_button), NULL);
+
+
+'''
 
 #SPDocument *SPDocument::createNewDoc(gchar const *document_uri, bool keepalive, bool make_new, SPDocument *parent)
 
