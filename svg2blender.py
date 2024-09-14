@@ -186,7 +186,13 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 			bobs.append(ob)
 			ob.location.x = x * 0.01
 			ob.location.z = -y * 0.01
-			depth_faker( ob )
+			print('num layers:', len(ob.data.layers))
+			if len(ob.data.layers) > 100:
+				depth_faker( ob, lstep=0.001, sstep=0.001 )
+			elif len(ob.data.layers) > 50:
+				depth_faker( ob, lstep=0.003, sstep=0.003 )
+			else:
+				depth_faker( ob )
 			gpsvg = ob
 			if len(gpsvg.data.layers)==1:
 				assert len(gpsvg.data.layers[0].frames)==1
@@ -195,10 +201,16 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 				## if inkscape saves a flat svg no layers
 				gpstrokes = None
 
-		if not gpstrokes and rects and len(rects) <= len(gpsvg.data.layers):
+		print('num rects:', len(rects))
+
+		#if not gpstrokes and rects and len(rects) <= len(gpsvg.data.layers):
+		if not gpstrokes and rects:
 			cube_layers = {}
 			for r in rects:
 				print('stroke index:', r['index'])
+				if r['index'] >= len(gpsvg.data.layers):
+					print('ERROR: invalid layer indices')
+					break
 				glayer = gpsvg.data.layers[r['index']]
 				stroke = glayer.frames[0].strokes[0]
 				ax,ay,az = calc_avg_points( stroke )
@@ -243,7 +255,8 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 
 					ob.data.materials.append(mat)
 
-			make_cube_grease_rig( gpsvg, cube_layers )
+			if len(gpsvg.data.layers) < 100:
+				make_cube_grease_rig( gpsvg, cube_layers )
 
 
 		elif rects and gpstrokes:
