@@ -44,6 +44,7 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 				'width' : float(elt.getAttribute('width')),
 				'height' : float(elt.getAttribute('height')),
 				'color'  : elt.getAttribute('fill'),
+				'round'  : elt.getAttribute('ry'),
 				'index'  : eidx,
 			}
 			if not r['color'].strip():
@@ -62,6 +63,7 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 							'width' : float(e.getAttribute('width')),
 							'height' : float(e.getAttribute('height')),
 							'color'  : e.getAttribute('fill'),
+							'round'  : e.getAttribute('ry'),
 							'index'  : eidx,
 						}
 						if not r['color'].strip():
@@ -198,6 +200,14 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 				glayer.parent = ob
 
 				cube_layers[ r['index'] ] = {'cube':ob, 'layer':glayer}
+
+				if r['round']:
+					rad = float(r['round'])
+					#mod = ob.modifiers.new(name='round', type='SUBSURF')
+					mod = ob.modifiers.new(name='round', type='BEVEL')
+					mod.affect = 'VERTICES'
+					mod.width = rad * 0.01
+					mod.segments = 2
 
 				mod = ob.modifiers.new(name='extrude',type="SOLIDIFY")
 				mod.thickness = r['width'] * 0.02
