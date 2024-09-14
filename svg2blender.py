@@ -35,6 +35,8 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 	eidx = 0
 	for elt in svg.documentElement.childNodes:
 		if not hasattr(elt, 'tagName'): continue
+		if elt.tagName in 'metadata defs sodipodi:namedview'.split():
+			continue
 		if elt.tagName=='rect':
 			r = {
 				'x' : float(elt.getAttribute('x')),
@@ -169,17 +171,49 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 			ob.location.z = -y * 0.01
 			depth_faker( ob )
 			gpsvg = ob
-			assert len(gpsvg.data.layers)==1
-			assert len(gpsvg.data.layers[0].frames)==1
-			gpstrokes = gpsvg.data.layers[0].frames[0].strokes
+			if len(gpsvg.data.layers)==1:
+				assert len(gpsvg.data.layers[0].frames)==1
+				gpstrokes = gpsvg.data.layers[0].frames[0].strokes
+			else:
+				## if inkscape saves a flat svg no layers
+				gpstrokes = None
+
+		if not gpstrokes and rects and len(rects)==len(gpsvg.data.layers):
+			for r in rects:
+				print('stroke index:', r['index'])
+				stroke = gpsvg.data.layers[r['index']].frames[0].strokes[0]
+				ax,ay,az = calc_avg_points( stroke )
+				bpy.ops.mesh.primitive_plane_add(location=(ax,ay,az))
+				ob = bpy.context.active_object
+				#ob.scale.x = (r['width']/2) * 0.01
+				#ob.scale.y = (r['height']/2) * 0.01
+				_w, _h = calc_width_height(stroke.points)
+				ob.scale.x = _w/2
+				ob.scale.y = _h/2
+				ob.rotation_euler.x = math.pi/2
+				ob.location.y += 0.05
+
+				mod = ob.modifiers.new(name='extrude',type="SOLIDIFY")
+				mod.thickness = r['width'] * 0.02
+
+				clr = r['color']
+				if clr and clr.startswith('#'):
+					if clr in bpy.data.materials:
+						mat = bpy.data.materials[clr]
+					else:
+						mat = bpy.data.materials.new(name=clr)
+						r,g,b = hex2rgb(clr[1:])
+						mat.diffuse_color[0] = r / 255
+						mat.diffuse_color[1] = g / 255
+						mat.diffuse_color[2] = b / 255
+
+					ob.data.materials.append(mat)
 
 
-		if rects:
+		elif rects and gpstrokes:
 			bpy.ops.object.empty_add(type="ARROWS")
 			root = bpy.context.active_object
 			root.name='OFFSEET'
-
-
 
 			for r in rects:
 				print('stroke index:', r['index'])
