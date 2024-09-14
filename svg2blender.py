@@ -83,40 +83,55 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 			if not len(t.childNodes): continue
 			print(t.toxml())
 			tid = t.getAttribute('id')
-			tx  = float(t.getAttribute('x'))
-			ty  = float(t.getAttribute('y'))
+			if t.hasAttribute('x'):
+				tx  = float(t.getAttribute('x'))
+				ty  = float(t.getAttribute('y'))
+			else:
+				tx = ty = 0
 			tscl = t.getAttribute('transform')
 			if tscl.startswith('scale('):
 				tsx, tsy = tscl.split('(')[-1].split(')')[0].split(',')
 				tsx = float(tsx)
 				tsy = float(tsy)
+			else:
+				tsx = tsy = 1.0
+
 			inkscript = []
 			for child in t.childNodes:
 				if child.tagName=='desc':
 					## INKSCAPE metadata
 					inkscript.append(child.firstChild.nodeValue)
-				elif child.tagName=='tspan':
-					style = child.getAttribute('style')
+					break
+			for child in t.getElementsByTagName('tspan'):
+				style = child.getAttribute('style')
+				if style:
 					fontsize = style.split('font-size:')[-1].split(';')[0]
 					assert fontsize.endswith('px')
 					fontsize = float(fontsize[:-2])
-					text = child.firstChild.nodeValue
-					if bpy:
-						bpy.ops.object.text_add()
-						ob = bpy.context.active_object
-						ob.data.body = text
-						ob.name = tid
-						ob.rotation_euler.x = math.pi/2
-						ob.data.size=fontsize * 0.01 * 2
-						ob.scale.x = tsx
-						ob.scale.y = tsy
-						bobs.append(ob)
-						if inkscript:
-							sco = {'bpy':bpy, 'self':ob, 'math':math, 'random':random}
-							sco[tid] = ob
-							txt = bpy.data.texts.new(name=tid+'.'+kra_fname)
-							txt.from_string('\n'.join(inkscript))
-							SCRIPTS.append({'scope':sco, 'script':txt})
+				else:
+					fontsize = 10
+				text = child.firstChild.nodeValue
+				if not text:
+					if child.hasAttribute('x'):
+						tx  = float(child.getAttribute('x'))
+						ty  = float(child.getAttribute('y'))
+
+				if bpy and text:
+					bpy.ops.object.text_add()
+					ob = bpy.context.active_object
+					ob.data.body = text
+					ob.name = tid
+					ob.rotation_euler.x = math.pi/2
+					ob.data.size=fontsize * 0.01 * 2
+					ob.scale.x = tsx
+					ob.scale.y = tsy
+					bobs.append(ob)
+					if inkscript:
+						sco = {'bpy':bpy, 'self':ob, 'math':math, 'random':random}
+						sco[tid] = ob
+						txt = bpy.data.texts.new(name=tid+'.'+kra_fname)
+						txt.from_string('\n'.join(inkscript))
+						SCRIPTS.append({'scope':sco, 'script':txt})
 	if bpy:
 		groups = []
 		gstep = 0.01
