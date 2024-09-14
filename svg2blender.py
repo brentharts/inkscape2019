@@ -181,7 +181,8 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 		if not gpstrokes and rects and len(rects) <= len(gpsvg.data.layers):
 			for r in rects:
 				print('stroke index:', r['index'])
-				stroke = gpsvg.data.layers[r['index']].frames[0].strokes[0]
+				glayer = gpsvg.data.layers[r['index']]
+				stroke = glayer.frames[0].strokes[0]
 				ax,ay,az = calc_avg_points( stroke )
 				bpy.ops.mesh.primitive_plane_add(location=(ax,ay,az))
 				ob = bpy.context.active_object
@@ -192,6 +193,8 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 				ob.scale.y = _h/2
 				ob.rotation_euler.x = math.pi/2
 				ob.location.y += 0.05
+				bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+				glayer.parent = ob
 
 				mod = ob.modifiers.new(name='extrude',type="SOLIDIFY")
 				mod.thickness = r['width'] * 0.02
