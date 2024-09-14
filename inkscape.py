@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-import os, sys, subprocess, xml.dom.minidom, ctypes, atexit, json
+import os, sys, subprocess, xml.dom.minidom, ctypes, atexit, json, time
 
 if '--install' in sys.argv:
 	#if 'fedora' in os.uname().nodename:  ## this breaks when connected to internet DHCP :(
 	if os.path.isfile('/usr/bin/dnf'):
-		cmd = 'sudo dnf install libsoup-devel gsl-devel pango-devel cairo-devel double-conversion-devel gc-devel potrace-devel gtkmm3.0-devel libgdl-devel gtkspell3-devel boost-devel libxslt-devel'
+		cmd = 'sudo dnf install python3-gobject libsoup-devel gsl-devel pango-devel cairo-devel double-conversion-devel gc-devel potrace-devel gtkmm3.0-devel libgdl-devel gtkspell3-devel boost-devel libxslt-devel'
 	else:
-		cmd = 'sudo apt-get install libharfbuzz-dev libmagick++-dev libaspell-dev libgraphicsmagick1-dev libgtkspell3-3-dev libcdr-dev libvisio-dev libwpg-dev libwpd-dev libsoup2.4-dev libxslt-dev libboost-all-dev liblcms2-dev libgc-dev libdouble-conversion-dev libpotrace-dev libpangomm-2.48-dev libcairomm-1.16-dev libgtkmm-3.0-dev libgdl-3-dev libpoppler-dev libpoppler-glib-dev mm-common'
+		cmd = 'sudo apt-get install python3-gi libharfbuzz-dev libmagick++-dev libaspell-dev libgraphicsmagick1-dev libgtkspell3-3-dev libcdr-dev libvisio-dev libwpg-dev libwpd-dev libsoup2.4-dev libxslt-dev libboost-all-dev liblcms2-dev libgc-dev libdouble-conversion-dev libpotrace-dev libpangomm-2.48-dev libcairomm-1.16-dev libgtkmm-3.0-dev libgdl-3-dev libpoppler-dev libpoppler-glib-dev mm-common'
 	print(cmd)
 	subprocess.check_call(cmd.split())
 
@@ -307,8 +307,67 @@ def inkscape_python():
 			cmd = ['python3', svg2blender, tmp, '--blender']
 			print(cmd)
 			subprocess.check_call(cmd)
-			changes = json.loads(open('/tmp/__inkscape__.json').read())
-			print('changes from blender:', changes)
+			if os.path.isfile('/tmp/__inkscape__.json'):
+				changes = json.loads(open('/tmp/__inkscape__.json').read())
+				print('changes from blender:', changes)
+				os.unlink('/tmp/__inkscape__.json')
+				#save_ink3d( tmp, changes)
+				d = {
+					'svg': open(tmp).read(),
+					'changes' : changes,
+				}
+				win = SaveHelper(d)
+				win.show_all()
+				Gtk.main()
+				print('clean exit Gtk.main')
+
+def save_ink3d(svg, changes):
+	import pickle
+	d = {
+		'svg': open(svg).read(),
+		'changes' : changes,
+	}
+	open('/tmp/__inkscape__.ink3d', 'wb').write(pickle.dumps(d))
+
+
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk
+
+class SaveHelper(Gtk.Window):
+	def __init__(self, dump):
+		super().__init__(title="Save Ink3D File")
+		self.dump = dump
+		self.set_default_size(380, 200)
+		vbox = Gtk.VBox(spacing=6)
+		self.add(vbox)
+		label = Gtk.Label(label="Project Folder:")
+		vbox.pack_start(label, False, False, 0)
+		self.entry_prj = Gtk.Entry()
+		self.entry_prj.set_text(os.path.expanduser('~/Documents'))
+		vbox.pack_start(self.entry_prj, False, False, 0)
+
+		label = Gtk.Label(label="Ink3D File Name:")
+		vbox.pack_start(label, False, False, 0)
+		self.entry_file = Gtk.Entry()
+		self.entry_file.set_text('%s.ink3d' % time.time())
+		vbox.pack_start(self.entry_file, False, False, 0)
+
+		button = Gtk.Button(label="Save")
+		button.connect("clicked", self.on_click)
+		vbox.pack_start(button, False, False, 0)
+		self.connect("destroy", Gtk.main_quit)
+
+	def on_click(self, button):
+		import pickle
+		path = os.path.join( self.entry_prj.get_text(), self.entry_file.get_text() )
+		if not path.endswith('.ink3d'): path += '.ink3d'
+		print('saving path:', path)
+		open(path, 'wb').write(pickle.dumps(self.dump))
+		button.set_label('SAVED OK')
+		self.close()
+		Gtk.main_quit()
+
 
 if __name__=='__main__':
 	if not os.path.isfile(INKSCAPE_EXE) or '--rebuild' in sys.argv:
