@@ -92,18 +92,28 @@ extern "C" SPDocument* inkscape_get_document(){
 	return __doc__;
 }
 
+int __inkstate__ = 0;
+extern "C" int inkscape_get_state(){ return __inkstate__; }
+extern "C" int inkscape_poll_state(){
+	int ret = __inkstate__;
+	__inkstate__=0;
+	return ret;
+}
+
 
 static void test_button(GtkWidget *widget, gpointer   data) {
 	std::cout << "clicked OK" << std::endl;
 	Inkscape::XML::Node *repr = __doc__->getReprRoot();
-
-
+	__inkstate__=0;
 	// see src/inkscape.cpp
 	FILE *file = Inkscape::IO::fopen_utf8name("/tmp/__inkscape__.svg", "w");
 	gchar *errortext = nullptr;
 	if (file) {
 		sp_repr_save_stream(repr->document(), file, SP_SVG_NS_URI);
 		fclose(file);
+		__inkstate__ = 1;
+	} else {
+		__inkstate__ = -1;
 	}
 }
 
@@ -113,7 +123,7 @@ INKSCAPE_TOOLBAR = '''
         //auto split = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
         auto grid = gtk_grid_new();
         //auto btn = gtk_widget_new(GTK_TYPE_BUTTON, "hi");//new Gtk::Button();
-        auto btn = gtk_button_new_with_label("hi");
+        auto btn = gtk_button_new_with_label("blender");
         //btn->set_label("hello");
         //split->pack_start(*btn);
         //split->pack_start(*Glib::wrap(dtw->tool_toolbox), false, true);
@@ -170,59 +180,6 @@ extern "C" void inkscape_gtk_update(){
 }
 '''
 
-## TODO
-INKSCAPE_MODULE_LOW_LEVEL = '''
-class InkscapeModule : public InkscapeApplication {
-	public:
-	InkscapeModule(){};
-	virtual void on_startup() override {
-		std::cout << "on_startup()" << std::endl;
-
-	};
-	virtual void on_startup2() override {
-		std::cout << "on_startup2()" << std::endl;
-
-	};
-	virtual InkFileExportCmd* file_export() override {
-		std::cout << "file_export()" << std::endl;
-	};
-	virtual int  on_handle_local_options(const Glib::RefPtr<Glib::VariantDict>& options) override {
-		std::cout << "on_handle_local_options()" << std::endl;
-
-	};
-	virtual void on_new() override {
-		std::cout << "on_new()" << std::endl;
-	};
-	virtual void on_quit()  override {
-		std::cout << "on_quit()" << std::endl;
-	};
-};
-
-InkscapeModule *app;
-InkscapeWindow *win;
-SPDocument *doc;
-
-extern "C" int inkscape_init_lowlevel(){
-	bool with_gui=true;
-	if (gtk_init_check(NULL, NULL)){
-		std::cout << "GC::init()" << std::endl;
-		Inkscape::GC::init();
-		std::cout << "Inkscape::Application::create" << std::endl;
-		Inkscape::Application::create(with_gui);
-		std::cout << "new SPDoc" << std::endl;
-		doc = new SPDocument();
-		std::cout << "new InkscapeModule" << std::endl;
-		app = new InkscapeModule();
-		std::cout << app << std::endl;
-		win = app->window_open(doc);
-		std::cout << "window_open OK" << std::endl;
-		return 1;
-	} else {
-		return 0;
-	}
-}
-
-'''
 
 def get_inkscape_includes():
 	cmd = [
@@ -321,6 +278,16 @@ def inkscape_python():
 	lib.inkscape_window_open()
 	while True:
 		lib.inkscape_gtk_update()
+		status = lib.inkscape_poll_state()
+		if status < 0:
+			print('inkscape CAPI error:', status)
+			break
+		elif status == 1:
+			tmp = "/tmp/__inkscape__.svg"
+			svg2blender = os.path.join(_thisdir,'svg2blender.py')
+			cmd = ['python3', svg2blender, tmp, '--blender']
+			print(cmd)
+			subprocess.check_call(cmd)
 
 if __name__=='__main__':
 	if not os.path.isfile(INKSCAPE_EXE) or '--rebuild' in sys.argv:
