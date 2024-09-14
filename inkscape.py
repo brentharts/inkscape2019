@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, sys, subprocess, xml.dom.minidom, ctypes, atexit
+import os, sys, subprocess, xml.dom.minidom, ctypes, atexit, json
 
 if '--install' in sys.argv:
 	#if 'fedora' in os.uname().nodename:  ## this breaks when connected to internet DHCP :(
@@ -307,6 +307,8 @@ def inkscape_python():
 			cmd = ['python3', svg2blender, tmp, '--blender']
 			print(cmd)
 			subprocess.check_call(cmd)
+			changes = json.loads(open('/tmp/__inkscape__.json').read())
+			print('changes from blender:', changes)
 
 if __name__=='__main__':
 	if not os.path.isfile(INKSCAPE_EXE) or '--rebuild' in sys.argv:
