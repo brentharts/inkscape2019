@@ -49,7 +49,7 @@ def gen_min_toolbar_ui():
 	tb = doc.createElement('toolbar')
 	tb.setAttribute('name', 'ToolToolbar')
 	ui.appendChild(tb)
-	tools = 'ToolSelector ToolNode ToolRect ToolArc ToolPencil ToolPen ToolCalligraphic ToolText ToolEraser ToolPaintBucket'.split()
+	tools = 'ToolRect ToolArc ToolPencil ToolPen ToolCalligraphic ToolText ToolEraser ToolPaintBucket ToolSelector ToolNode'.split()
 	#tools.append('PythonScript')  ## rather than hook into inkscape actions api, we can just generate simple C++ .inc files
 	for act in tools:
 		a = doc.createElement('toolitem')
@@ -295,6 +295,10 @@ if __name__=='__main__':
 	if not os.path.isdir('/usr/local/share/inkscape'):
 		os.system('sudo mkdir /usr/local/share/inkscape')
 		os.system('sudo cp -Rv ./share/pixmaps /usr/local/share/inkscape/.')
+	if not os.path.isdir('/usr/local/share/inkscape/icons') and os.path.isdir('/usr/share/inkscape/icons'):  ## symlink icons from system installed inkscape
+		cmd = 'sudo ln -s /usr/share/inkscape/icons /usr/local/share/inkscape/icons'
+		print(cmd)
+		os.system(cmd)
 
 	ensure_user_config()
 	if '--exe' in sys.argv:
