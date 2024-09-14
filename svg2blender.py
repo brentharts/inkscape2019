@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, sys, io, zipfile, xml.dom.minidom, subprocess, math
+import os, sys, io, zipfile, xml.dom.minidom, subprocess, math, json
 from random import random, uniform
 
 try:
@@ -189,6 +189,9 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 				ax,ay,az = calc_avg_points( stroke )
 				bpy.ops.mesh.primitive_plane_add(location=(ax,ay,az))
 				ob = bpy.context.active_object
+				ob.name = glayer.info
+				ob.lock_location[0]=True
+				ob.lock_location[2]=True
 				#ob.scale.x = (r['width']/2) * 0.01
 				#ob.scale.y = (r['height']/2) * 0.01
 				_w, _h = calc_width_height(stroke.points)
@@ -356,7 +359,7 @@ def make_cube_grease_rig( gpsvg, cube_layers ):
 		next = nn
 
 	if head_cube:
-		head_cube.name='HEAD'
+		head_cube['__TYPE__']='HEAD'
 	for leg in leg_cubes:
 		leg.name='LEG'
 		if head_cube and abs(head_cube.location.x) > 0.75:
@@ -364,6 +367,10 @@ def make_cube_grease_rig( gpsvg, cube_layers ):
 			mod.use_relative_offset = False
 			mod.use_constant_offset = True
 			mod.constant_offset_displace = [0,root_cube.dimensions.y*0.9,0]
+
+	for i in cube_layers:
+		o = cube_layers[i]['cube']
+		o['__Y__'] = o.location.y
 
 def make_grease_layers(ob):
 	mlayers = {
@@ -865,7 +872,20 @@ class Svg2BlenderOperator(bpy.types.Operator):
 	def execute (self, context):
 		return self.invoke(context, None)
 
+
+def on_blend_save(blend):
+	print('USER saved blend file:', blend)
+	dump = {}
+	for ob in bpy.data.objects:
+		if '__Y__' in ob.keys() and ob['__Y__'] != ob.location.y:
+			dump[ob.name]=ob.location.y
+	print('json dump:', dump)
+	open('/tmp/__inkscape__.json','w').write(json.dumps(dump))
+
 if __name__=='__main__':
+	bpy.context.preferences.view.show_splash = False
+	bpy.ops.wm.save_as_mainfile(filepath="/tmp/__inkscape__.blend")
+	bpy.app.handlers.save_post.append(on_blend_save)
 	if 'Cube' in bpy.data.objects:
 		bpy.data.objects['Cube'].hide_set(True)
 	bpy.ops.svg2blender.run()
