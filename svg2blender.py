@@ -82,6 +82,19 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 		for t in texts:
 			if not len(t.childNodes): continue
 			print(t.toxml())
+			clr = None
+			if t.hasAttribute('style'):
+				style = t.getAttribute('style')
+				fontsize = style.split('font-size:')[-1].split(';')[0]
+				assert fontsize.endswith('px')
+				fontsize = float(fontsize[:-2])
+				print('fontsize:', fontsize)
+				if 'fill:' in style:
+					clr = style.split('fill:')[-1].split(';')[0]
+					print('color:', clr)
+
+
+
 			tid = t.getAttribute('id')
 			if t.hasAttribute('x'):
 				tx  = float(t.getAttribute('x'))
@@ -96,6 +109,13 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 			else:
 				tsx = tsy = 1.0
 
+			if tscl.startswith('rotate('):
+				trot = float( tscl.split('(')[-1].split(')')[0] )
+				print('rotate:', trot)
+			else:
+				trot = 0
+
+
 			inkscript = []
 			for child in t.childNodes:
 				if child.tagName=='desc':
@@ -108,8 +128,7 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 					fontsize = style.split('font-size:')[-1].split(';')[0]
 					assert fontsize.endswith('px')
 					fontsize = float(fontsize[:-2])
-				else:
-					fontsize = 10
+
 				text = child.firstChild.nodeValue
 				if not text:
 					if child.hasAttribute('x'):
@@ -122,9 +141,27 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 					ob.data.body = text
 					ob.name = tid
 					ob.rotation_euler.x = math.pi/2
-					ob.data.size=fontsize * 0.01 * 2
+					ob.data.size=fontsize * 0.05
+					ob.data.extrude = ob.data.size / 4
 					ob.scale.x = tsx
 					ob.scale.y = tsy
+					ob.location.x = tx * 0.01
+					ob.location.z = ty * 0.01
+					if trot:
+						ob.rotation_euler.y = math.radians(trot)
+					if clr:
+						if clr and clr.startswith('#'):
+							if clr in bpy.data.materials:
+								mat = bpy.data.materials[clr]
+							else:
+								mat = bpy.data.materials.new(name=clr)
+								r,g,b = hex2rgb(clr[1:])
+								mat.diffuse_color[0] = r / 255
+								mat.diffuse_color[1] = g / 255
+								mat.diffuse_color[2] = b / 255
+
+							ob.data.materials.append(mat)
+
 					bobs.append(ob)
 					if inkscript:
 						sco = {'bpy':bpy, 'self':ob, 'math':math, 'random':random}
