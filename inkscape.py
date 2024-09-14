@@ -33,9 +33,15 @@ VOID:INT,INT
 VOID:STRING,STRING
 '''
 
-def build():
+def build(use_swatches=False):
 	open('/tmp/__inkscape__.toolbar.inc','w').write(INKSCAPE_TOOLBAR)
 	open('/tmp/__inkscape__.header.inc','w').write(INKSCAPE_HEADER)
+	open('/tmp/__inkscape__.exit.inc','w').write(INKSCAPE_EXIT)
+	if use_swatches:
+		open('/tmp/__inkscape__.swatch.inc','w').write(INKSCAPE_SWATCH)
+	else:
+		open('/tmp/__inkscape__.swatch.inc','w').write('')
+
 	_helpers = os.path.join(_thisdir,'src/helper')
 	open( os.path.join(_helpers, 'sp-marshal.list'), 'w').write(SP_MARSHAL_LIST)
 	cmd = ['cmake', os.path.abspath(_thisdir), '-DENABLE_POPPLER=0', '-DENABLE_POPPLER_CAIRO=0', '-DUSE_TRACE=1', '-DUSE_AUTOTRACE=1']
@@ -82,6 +88,18 @@ def ensure_user_config( minimal=True, menu=True ):
 
 	atexit.register(cleanup)
 
+#dtw->_panels = new Inkscape::UI::Dialog::SwatchesPanel("/embedded/swatches");
+#dtw->_panels->set_vexpand(false);
+INKSCAPE_SWATCH = '''
+	dtw->_vbox->pack_end(*dtw->_panels, false, true);
+'''
+
+INKSCAPE_EXIT = '''
+	std::cout << "user clicked exit button" << std::endl;
+	__inkstate__ = -1;
+
+'''
+
 INKSCAPE_HEADER = '''
 #include "io/sys.h"
 SPDocument *__doc__;
@@ -113,7 +131,7 @@ static void test_button(GtkWidget *widget, gpointer   data) {
 		fclose(file);
 		__inkstate__ = 1;
 	} else {
-		__inkstate__ = -1;
+		__inkstate__ = -2;
 	}
 }
 
@@ -280,7 +298,8 @@ def inkscape_python():
 		lib.inkscape_gtk_update()
 		status = lib.inkscape_poll_state()
 		if status < 0:
-			print('inkscape CAPI error:', status)
+			if status < -1:
+				print('inkscape CAPI error:', status)
 			break
 		elif status == 1:
 			tmp = "/tmp/__inkscape__.svg"
