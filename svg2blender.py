@@ -179,6 +179,7 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 				gpstrokes = None
 
 		if not gpstrokes and rects and len(rects) <= len(gpsvg.data.layers):
+			cube_layers = {}
 			for r in rects:
 				print('stroke index:', r['index'])
 				glayer = gpsvg.data.layers[r['index']]
@@ -196,6 +197,8 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 				bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
 				glayer.parent = ob
 
+				cube_layers[ r['index'] ] = {'cube':ob, 'layer':glayer}
+
 				mod = ob.modifiers.new(name='extrude',type="SOLIDIFY")
 				mod.thickness = r['width'] * 0.02
 
@@ -211,6 +214,8 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 						mat.diffuse_color[2] = b / 255
 
 					ob.data.materials.append(mat)
+
+			make_cube_grease_rig( gpsvg, cube_layers )
 
 
 		elif rects and gpstrokes:
@@ -278,6 +283,77 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 			root.scale *= 1.333
 
 	return bobs
+
+def calc_near_object(x,y,z, objects):
+	nob = None
+	ndist = float('inf')
+	v = mathutils.Vector(x,y,z)
+	for idx in objects:
+		ob = objects[idx]['cube']
+		dist = (v-ob.location).length
+		if dist < ndist:
+			nob = ob
+			ndist = dist
+	return nob
+
+
+def make_cube_grease_rig( gpsvg, cube_layers ):
+	def next_cube(prev_cube=None):
+		nxt = None
+		for i in cube_layers:
+			o = cube_layers[i]['cube']
+			if o.parent: continue
+			if o == prev_cube: continue
+			if nxt is None or o.dimensions > nxt.dimensions:
+				nxt = o
+		return nxt
+
+	for idx, layer in enumerate(gpsvg.data.layers):
+		if idx not in cube_layers:
+			if layer.parent:
+				print('layer already has parent', layer, layer.parent)
+				continue
+			stroke = layer.frames[0].strokes[0]
+			ax,ay,az = calc_avg_points( stroke )
+			p = calc_near_object(ax,ay,az, cube_layers)
+			layer.parent = p
+
+	next = next_cube()
+	root_cube = next
+	head_cube = None
+	leg_cubes = []
+
+	bpy.ops.object.empty_add(type="CIRCLE")
+	root = bpy.context.active_object
+	next.parent = root
+	delta = next.location - root.location
+	next.location = [0,0,0]
+
+	while next:
+		nn = next_cube(next)
+		if nn:
+			nn.location -= delta
+			nn.parent = root_cube
+			#if nn.location.z < 0:
+			#	nn.parent = root_cube
+			#else:
+			#	nn.parent = next
+			if not head_cube and nn.location.z > 0.1:
+				head_cube = nn
+			elif len(leg_cubes) < 2 and nn.location.z < -0.1:
+				if nn.dimensions.x < nn.dimensions.z / 3:
+					leg_cubes.append(nn)
+		next = nn
+
+	if head_cube:
+		head_cube.name='HEAD'
+	for leg in leg_cubes:
+		leg.name='LEG'
+		if head_cube and abs(head_cube.location.x) > 0.75:
+			mod = leg.modifiers.new(name='more-legs', type='ARRAY')
+			mod.use_relative_offset = False
+			mod.use_constant_offset = True
+			mod.constant_offset_displace = [0,root_cube.dimensions.y*0.9,0]
 
 def make_grease_layers(ob):
 	mlayers = {
@@ -348,7 +424,6 @@ def calc_avg_points(stroke):
 	return (x,y,z)
 
 hex2rgb = lambda hx: (int(hx[0:2],16),int(hx[2:4],16),int(hx[4:6],16))
-#def hex2rgb(hexcode): return tuple(map(ord,hexcode[1:].decode('hex')))
 
 def bpy_make_rect(x,y, width, height, scale=0.01):
 	mesh_data = bpy.data.meshes.new("Rectangle")
