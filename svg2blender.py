@@ -178,7 +178,7 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 				## if inkscape saves a flat svg no layers
 				gpstrokes = None
 
-		if not gpstrokes and rects and len(rects)==len(gpsvg.data.layers):
+		if not gpstrokes and rects and len(rects) <= len(gpsvg.data.layers):
 			for r in rects:
 				print('stroke index:', r['index'])
 				stroke = gpsvg.data.layers[r['index']].frames[0].strokes[0]
@@ -776,5 +776,7 @@ class Svg2BlenderOperator(bpy.types.Operator):
 	def execute (self, context):
 		return self.invoke(context, None)
 
-
-bpy.ops.svg2blender.run()
+if __name__=='__main__':
+	if 'Cube' in bpy.data.objects:
+		bpy.data.objects['Cube'].hide_set(True)
+	bpy.ops.svg2blender.run()
