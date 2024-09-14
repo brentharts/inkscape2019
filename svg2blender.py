@@ -3,7 +3,7 @@ import os, sys, io, zipfile, xml.dom.minidom, subprocess, math
 from random import random, uniform
 
 try:
-	import bpy
+	import bpy, mathutils
 except:
 	bpy = None
 
@@ -287,7 +287,7 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 def calc_near_object(x,y,z, objects):
 	nob = None
 	ndist = float('inf')
-	v = mathutils.Vector(x,y,z)
+	v = mathutils.Vector([x,y,z])
 	for idx in objects:
 		ob = objects[idx]['cube']
 		dist = (v-ob.location).length
@@ -782,6 +782,7 @@ if __name__ == "__main__":
 ## in blender below this point ##
 if not bpy: sys.exit()
 from bpy_extras.io_utils import ImportHelper
+import mathutils
 
 @bpy.utils.register_class
 class Inkscape4Blender(bpy.types.Operator, ImportHelper):
