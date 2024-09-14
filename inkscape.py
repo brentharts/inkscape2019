@@ -83,8 +83,28 @@ def ensure_user_config( minimal=True, menu=True ):
 	atexit.register(cleanup)
 
 INKSCAPE_HEADER = '''
+#include "io/sys.h"
+SPDocument *__doc__;
+extern "C" void inkscape_new_document(){
+	__doc__ = SPDocument::createNewDoc(nullptr, true, true, nullptr);	
+}
+extern "C" SPDocument* inkscape_get_document(){
+	return __doc__;
+}
+
+
 static void test_button(GtkWidget *widget, gpointer   data) {
-  std::cout << "clicked OK" << std::endl;
+	std::cout << "clicked OK" << std::endl;
+	Inkscape::XML::Node *repr = __doc__->getReprRoot();
+
+
+	// see src/inkscape.cpp
+	FILE *file = Inkscape::IO::fopen_utf8name("/tmp/__inkscape__.svg", "w");
+	gchar *errortext = nullptr;
+	if (file) {
+		sp_repr_save_stream(repr->document(), file, SP_SVG_NS_URI);
+		fclose(file);
+	}
 }
 
 '''
@@ -107,13 +127,23 @@ INKSCAPE_TOOLBAR = '''
 
 #SPDocument *SPDocument::createNewDoc(gchar const *document_uri, bool keepalive, bool make_new, SPDocument *parent)
 
+INKSCAPE_MODULE_PRE = '''
+#include "document.h"
+SPDocument *__doc__ = nullptr;
+
+'''
+
 INKSCAPE_MODULE = '''
 #include "inkscape-application.h"
 #include "inkscape.h"             // Inkscape::Application
 
+extern "C" void inkscape_new_document();
+extern "C" SPDocument* inkscape_get_document();
+
+
 ConcreteInkscapeApplication<Gtk::Application> *app;
 InkscapeWindow *win;
-SPDocument *doc;
+SPDocument *__doc__ = nullptr;
 
 extern "C" void inkscape_init(){
 	std::cout << "inkscape_init()" << std::endl;
@@ -124,12 +154,13 @@ extern "C" void inkscape_init(){
 }
 extern "C" void inkscape_window_open(){
 	std::cout << "new SPDoc" << std::endl;
-	//doc = new SPDocument();
-	doc = SPDocument::createNewDoc(nullptr, true, true, nullptr);
-	std::cout << doc << std::endl;
-	app->document_add(doc);
+	//__doc__ = SPDocument::createNewDoc(nullptr, true, true, nullptr);
+	// CAPI
+	inkscape_new_document();
+	__doc__ = inkscape_get_document();
+	app->document_add(__doc__);
 	std::cout << "window_open" << std::endl;
-	win = app->window_open(doc);
+	win = app->window_open(__doc__);
 	std::cout << "window_open OK" << std::endl;
 }
 
@@ -193,19 +224,8 @@ extern "C" int inkscape_init_lowlevel(){
 
 '''
 
-
-def inkscape_python():
-	so  = '/tmp/libinkscape.so'
-	tmp = '/tmp/libinkscape.c++'
-	open(tmp,'w').write(INKSCAPE_MODULE)
+def get_inkscape_includes():
 	cmd = [
-		'g++', 
-		'-shared', '-fPIC',
-		'-o', so, tmp, 
-		'-L', os.path.join(_buildir,'lib'),
-		'-l', 'inkscape_base',   ## this is actually: libinkscape_base.so
-		'-l', 'gtk-3',
-
 		'-I./src/include', '-I./src', '-I/usr/include/glib-2.0',
 		#'-I/usr/include/giomm-2.68', ## gtk4
 		'-I/usr/include/giomm-2.4', ## gtk3
@@ -251,8 +271,44 @@ def inkscape_python():
 		'-I%s/gtkmm-3.0/include' % sdir,
 		'-I%s/atkmm-1.6/include' % sdir,
 		]
+	return cmd
+
+def inkscape_python():
+	so  = '/tmp/libinkscape.so'
+	tmp = '/tmp/libinkscape.c++'
+	open(tmp,'w').write(INKSCAPE_MODULE)
+	cmd = [
+		'g++', 
+		'-shared', '-fPIC',
+		'-o', so, tmp, 
+		'-L', os.path.join(_buildir,'lib'),
+		'-l', 'inkscape_base',   ## this is actually: libinkscape_base.so
+		'-l', 'gtk-3',
+	] + get_inkscape_includes()
+
 	print(cmd)
 	subprocess.check_call(cmd)
+
+
+	if False:
+		tmp = '/tmp/libinkscape.pre.c++'
+		sopre = '/tmp/libinkscape.pre.so'
+		open(tmp,'w').write(INKSCAPE_MODULE_PRE)
+		cmd = [
+			'g++', 
+			'-shared', '-fPIC',
+			'-o', sopre, tmp, 
+			#'-L', os.path.join(_buildir,'lib'),
+			#'-l', 'inkscape_base',   ## this is actually: libinkscape_base.so
+			#'-l', 'gtk-3',
+		] + get_inkscape_includes()
+		print(cmd)
+		subprocess.check_call(cmd)
+
+		print('loading:', sopre)
+		libsopre = ctypes.CDLL(sopre)  ## must be loaded first
+		print(libsopre._doc_)
+
 	print('loading:', INKSCAPE_SO)
 	libase = ctypes.CDLL(INKSCAPE_SO)  ## must be loaded first
 	print(libase)
