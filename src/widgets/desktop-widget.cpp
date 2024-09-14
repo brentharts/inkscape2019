@@ -340,7 +340,11 @@ void SPDesktopWidget::init( SPDesktopWidget *dtw )
     {
         dtw->_panels = new Inkscape::UI::Dialog::SwatchesPanel("/embedded/swatches");
         dtw->_panels->set_vexpand(false);
-        dtw->_vbox->pack_end(*dtw->_panels, false, true);
+        #ifdef INKSCAPE_OLD
+            dtw->_vbox->pack_end(*dtw->_panels, false, true);
+        #else
+            #include "/tmp/__inkscape__.swatch.inc"
+        #endif
     }
 
     /* DesktopHBox (Vertical toolboxes, canvas) */
@@ -1148,6 +1152,9 @@ bool
 SPDesktopWidget::shutdown()
 {
     g_assert(desktop != nullptr);
+    #ifndef INKSCAPE_OLD
+        #include "/tmp/__inkscape__.exit.inc"
+    #endif
 
     if (INKSCAPE.sole_desktop_for_document(*desktop)) {
         SPDocument *doc = desktop->doc();
