@@ -425,6 +425,7 @@ def make_cube_grease_rig( gpsvg, cube_layers ):
 	delta = next.location - root.location
 	next.location = [0,0,0]
 
+	lower_body = []
 	while next:
 		nn = next_cube(next)
 		if nn:
@@ -439,17 +440,49 @@ def make_cube_grease_rig( gpsvg, cube_layers ):
 			elif len(leg_cubes) < 2 and nn.location.z < -0.1:
 				if nn.dimensions.x < nn.dimensions.z / 3:
 					leg_cubes.append(nn)
+			if nn.location.z < -0.1:
+				lower_body.append(nn)
 		next = nn
 
 	if head_cube:
 		head_cube['__TYPE__']='HEAD'
+
+	pivs = []
 	for leg in leg_cubes:
-		leg.name='LEG'
+		leg['__TYPE__'] = 'LEG'
+		bpy.ops.object.empty_add(type="CIRCLE", location=leg.location)
+		pivot = bpy.context.active_object
+		pivs.append(pivot)
+		pivot.empty_display_size=0.3
+		deltaz = leg.dimensions.z/2
+		pivot.location.z += deltaz
+		leg.parent = pivot
+		leg.location = [0,0,-deltaz]
+
 		if head_cube and abs(head_cube.location.x) > 0.75:
 			mod = leg.modifiers.new(name='more-legs', type='ARRAY')
 			mod.use_relative_offset = False
 			mod.use_constant_offset = True
 			mod.constant_offset_displace = [0,root_cube.dimensions.y*0.9,0]
+
+	for o in lower_body:
+		if o in leg_cubes: continue
+		for p in pivs:
+			parent = None
+			if o.location.x < 0 and p.location.x < 0:
+				parent = p
+			elif o.location.x > 0 and p.location.x > 0:
+				parent = p
+
+			if parent:
+				## https://blender.stackexchange.com/questions/152781/how-to-make-object-a-a-parentkeep-transform-of-object-b-via-blenders-python-a
+				bpy.context.evaluated_depsgraph_get().update()
+				# First, calculate the inverse of the parent's world matrix
+				parent_inverse_world_matrix = parent.matrix_world.inverted()
+				o.parent = parent
+				#o.matrix_parent_inverse = o.matrix_world @ parent_inverse_world_matrix
+				o.matrix_parent_inverse = parent_inverse_world_matrix
+				break
 
 	for i in cube_layers:
 		o = cube_layers[i]['cube']
