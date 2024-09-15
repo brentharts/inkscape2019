@@ -440,7 +440,8 @@ def make_cube_grease_rig( gpsvg, cube_layers ):
 
 	bpy.ops.object.empty_add(type="CIRCLE")
 	root = bpy.context.active_object
-	GameSim['bots'].append({'root':root, 'leg_roots':pivs, 'jump':0.0})
+	bot  = {'root':root, 'leg_roots':pivs, 'jump':0.0}
+	GameSim['bots'].append(bot)
 	next.parent = root
 	delta = next.location - root.location
 	next.location = [0,0,0]
@@ -523,6 +524,7 @@ def make_cube_grease_rig( gpsvg, cube_layers ):
 			head_cube.parent = neck
 			head_cube.matrix_parent_inverse = neck.matrix_world.inverted()
 
+			bot['neck'] = neck
 		else:
 			neck = None
 		
@@ -544,7 +546,19 @@ def make_cube_grease_rig( gpsvg, cube_layers ):
 			elif 'eye' in o.name.lower():
 				ears.append(o)
 
-		if not eyes and not ears:
+		if not eyes:
+			if not eyes and len(gpsvg.data.layers) <= 16:  ## only for simple drawings
+				print('using fallback search for eyes')
+				for idx, o in enumerate(head_parts_upper):
+					if idx >= 6: break
+					if o in ears: continue
+					if check_object_inside_on_xz( o, head_cube ) and len(eyes) < 2:
+						o['__TYPE__']='EYE'
+						print('EYE', o)
+						eyes.append(o)
+						GameSim['eyes'].append(o)
+
+		if not ears:
 			## try to find the eyes in the first few rects
 			for idx, o in enumerate(head_parts_upper):
 				if idx >= 6: break
@@ -560,7 +574,9 @@ def make_cube_grease_rig( gpsvg, cube_layers ):
 					eyes.append(o)
 					GameSim['eyes'].append(o)
 
-		if eyes and ears:
+
+
+		if eyes or ears:
 			GameSim['heads'].append(head_cube)
 
 
@@ -569,6 +585,39 @@ def make_cube_grease_rig( gpsvg, cube_layers ):
 		o['__X__'] = o.location.x
 		o['__Y__'] = o.location.y
 		o['__RZ__'] = o.rotation_euler.z
+
+def check_object_inside_on_xz(obj1, obj2):
+	"""Checks if object1 is inside object2 on the x and z axes.
+
+	Args:
+	obj1 (bpy.types.Object): The first object.
+	obj2 (bpy.types.Object): The second object.
+
+	Returns:
+	bool: True if object1 is inside object2 on the x and z axes, False otherwise.
+	"""
+
+	# Get the dimensions and world space locations of both objects
+	dim1 = obj1.dimensions
+	loc1 = obj1.matrix_world.translation
+	dim2 = obj2.dimensions
+	loc2 = obj2.matrix_world.translation
+
+	# Calculate the minimum and maximum points of both objects on the x and z axes
+	min1_x = loc1.x - dim1.x / 2
+	max1_x = loc1.x + dim1.x / 2
+	min1_z = loc1.z - dim1.z / 2
+	max1_z = loc1.z + dim1.z / 2
+	min2_x = loc2.x - dim2.x / 2
+	max2_x = loc2.x + dim2.x / 2
+	min2_z = loc2.z - dim2.z / 2
+	max2_z = loc2.z + dim2.z / 2
+
+	# Check if the minimum and maximum points of object1 are within the minimum and maximum points of object2 on the x and z axes
+	if min1_x >= min2_x and max1_x <= max2_x and min1_z >= min2_z and max1_z <= max2_z:
+		return True
+	else:
+		return False
 
 
 def calc_overlap(obj1, obj2):
@@ -1164,6 +1213,9 @@ class Svg2BlenderOperator(bpy.types.Operator):
 					bot['root'].location.z += bot['jump']
 					bot['jump'] *= 0.5
 				bot['root'].location.z *= 0.7
+				if 'neck' in bot and random() < 0.05:
+					bot['neck'].rotation_euler.y = uniform(-1,0.2)
+
 
 			for eye in GameSim['eyes']:
 				if random() < 0.1:
