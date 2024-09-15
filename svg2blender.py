@@ -141,12 +141,14 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 					ob.data.body = text
 					ob.name = tid
 					ob.rotation_euler.x = math.pi/2
-					ob.data.size=fontsize * 0.05
-					ob.data.extrude = ob.data.size / 4
+					ob.data.size=fontsize * 0.025
+					ob.data.extrude = ob.data.size * 0.5
 					ob.scale.x = tsx
 					ob.scale.y = tsy
 					ob.location.x = tx * 0.01
 					ob.location.z = ty * 0.01
+					#ob.location.x -= 1  ## TODO calc offset from svg
+					#ob.location.z -= 0.5
 					if trot:
 						ob.rotation_euler.y = math.radians(trot)
 					if clr:
@@ -254,8 +256,12 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 				bpy.ops.mesh.primitive_plane_add(location=(ax,ay,az))
 				ob = bpy.context.active_object
 				ob.name = glayer.info
-				ob.lock_location[0]=True
+				#ob.lock_location[0]=True
 				ob.lock_location[2]=True
+				ob.lock_rotation[0]=True
+				ob.lock_rotation[1]=True
+				ob.lock_scale = [True,True,True]
+
 				#ob.scale.x = (r['width']/2) * 0.01
 				#ob.scale.y = (r['height']/2) * 0.01
 				_w, _h = calc_width_height(stroke.points)
@@ -435,7 +441,9 @@ def make_cube_grease_rig( gpsvg, cube_layers ):
 
 	for i in cube_layers:
 		o = cube_layers[i]['cube']
+		o['__X__'] = o.location.x
 		o['__Y__'] = o.location.y
+		o['__RZ__'] = o.rotation_euler.z
 
 def make_grease_layers(ob):
 	mlayers = {
@@ -942,8 +950,17 @@ def on_blend_save(blend):
 	print('USER saved blend file:', blend)
 	dump = {}
 	for ob in bpy.data.objects:
-		if '__Y__' in ob.keys() and ob['__Y__'] != ob.location.y:
-			dump[ob.name]=ob.location.y
+		if '__Y__' in ob.keys():
+			d = {}
+			if ob['__Y__'] != ob.location.y:
+				d['y'] = ob.location.y
+			if ob['__X__'] != ob.location.x:
+				d['x'] = ob.location.x
+			if ob['__RZ__'] != ob.rotation_euler.z:
+				d['rz'] = ob.rotation_euler.z
+			if d:
+				dump[ob.name]=d
+
 	print('json dump:', dump)
 	open('/tmp/__inkscape__.json','w').write(json.dumps(dump))
 
