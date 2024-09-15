@@ -248,7 +248,7 @@ def get_inkscape_includes():
 		]
 	return cmd
 
-def inkscape_python():
+def inkscape_python( force_rebuild=True ):
 	so  = '/tmp/libinkscape.so'
 	tmp = '/tmp/libinkscape.c++'
 	open(tmp,'w').write(INKSCAPE_MODULE)
@@ -261,8 +261,9 @@ def inkscape_python():
 		'-l', 'gtk-3',
 	] + get_inkscape_includes()
 
-	print(cmd)
-	subprocess.check_call(cmd)
+	if not os.path.isfile(so) or force_rebuild:
+		print(cmd)
+		subprocess.check_call(cmd)
 
 
 	if False:
@@ -329,44 +330,86 @@ def save_ink3d(svg, changes):
 	}
 	open('/tmp/__inkscape__.ink3d', 'wb').write(pickle.dumps(d))
 
+try:
+	import gi
+except:
+	gi = None
+	SaveHelper = None
 
-import gi
-gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk
+if not gi:
+	print('you should install python3-gi (ubuntu) or python3-gobject (fedora)')
 
-class SaveHelper(Gtk.Window):
-	def __init__(self, dump):
-		super().__init__(title="Save Ink3D File")
-		self.dump = dump
-		self.set_default_size(380, 200)
-		vbox = Gtk.VBox(spacing=6)
-		self.add(vbox)
-		label = Gtk.Label(label="Project Folder:")
-		vbox.pack_start(label, False, False, 0)
-		self.entry_prj = Gtk.Entry()
-		self.entry_prj.set_text(os.path.expanduser('~/Documents'))
-		vbox.pack_start(self.entry_prj, False, False, 0)
+if gi:
+	gi.require_version('Gtk', '3.0')
+	from gi.repository import Gtk
 
-		label = Gtk.Label(label="Ink3D File Name:")
-		vbox.pack_start(label, False, False, 0)
-		self.entry_file = Gtk.Entry()
-		self.entry_file.set_text('%s.ink3d' % time.time())
-		vbox.pack_start(self.entry_file, False, False, 0)
+	def run_frontend():
+		w = Ink3D()
+		w.show_all()
+		Gtk.main()
 
-		button = Gtk.Button(label="Save")
-		button.connect("clicked", self.on_click)
-		vbox.pack_start(button, False, False, 0)
-		self.connect("destroy", Gtk.main_quit)
+	class Ink3D(Gtk.Window):
+		def __init__(self, project_dir=os.path.expanduser('~/Documents')):
+			self.project_dir = project_dir
+			super().__init__(title="InkScape3D")
+			self.set_default_size(380, 200)
+			vbox = Gtk.VBox(spacing=6)
+			self.add(vbox)
+			btn = Gtk.Button(label='New Drawing')
+			btn.connect("clicked", self.on_new_drawing)
 
-	def on_click(self, button):
-		import pickle
-		path = os.path.join( self.entry_prj.get_text(), self.entry_file.get_text() )
-		if not path.endswith('.ink3d'): path += '.ink3d'
-		print('saving path:', path)
-		open(path, 'wb').write(pickle.dumps(self.dump))
-		button.set_label('SAVED OK')
-		self.close()
-		Gtk.main_quit()
+			vbox.pack_start(btn, False, False, 0)
+			for file in os.listdir(self.project_dir):
+				if file.endswith('.ink3d'):
+					pth = os.path.join(self.project_dir,file)
+					btn = Gtk.Button(label=pth)
+					vbox.pack_start(btn, False, False, 0)
+					btn.connect("clicked", lambda b, f=pth:self.on_open(f))
+
+			self.connect("destroy", Gtk.main_quit)
+
+		def on_open(self, file):
+			view_ink3d(file)
+
+		def on_new_drawing(self, btn):
+			self.close()
+			Gtk.main_quit()
+			inkscape_python(force_rebuild=False)
+
+
+	class SaveHelper(Gtk.Window):
+		def __init__(self, dump):
+			super().__init__(title="Save Ink3D File")
+			self.dump = dump
+			self.set_default_size(380, 200)
+			vbox = Gtk.VBox(spacing=6)
+			self.add(vbox)
+			label = Gtk.Label(label="Project Folder:")
+			vbox.pack_start(label, False, False, 0)
+			self.entry_prj = Gtk.Entry()
+			self.entry_prj.set_text(os.path.expanduser('~/Documents'))
+			vbox.pack_start(self.entry_prj, False, False, 0)
+
+			label = Gtk.Label(label="Ink3D File Name:")
+			vbox.pack_start(label, False, False, 0)
+			self.entry_file = Gtk.Entry()
+			self.entry_file.set_text('%s.ink3d' % time.time())
+			vbox.pack_start(self.entry_file, False, False, 0)
+
+			button = Gtk.Button(label="Save")
+			button.connect("clicked", self.on_click)
+			vbox.pack_start(button, False, False, 0)
+			self.connect("destroy", Gtk.main_quit)
+
+		def on_click(self, button):
+			import pickle
+			path = os.path.join( self.entry_prj.get_text(), self.entry_file.get_text() )
+			if not path.endswith('.ink3d'): path += '.ink3d'
+			print('saving path:', path)
+			open(path, 'wb').write(pickle.dumps(self.dump))
+			button.set_label('SAVED OK')
+			self.close()
+			Gtk.main_quit()
 
 def view_ink3d(ink3d):
 	import pickle
@@ -380,13 +423,18 @@ def view_ink3d(ink3d):
 	print(cmd)
 	subprocess.check_call(cmd)
 
-
-if __name__=='__main__':
+def run_inkscape():
 	for arg in sys.argv:
 		if arg.endswith('.ink3d'):
 			view_ink3d(arg)
 			sys.exit()
 
+	if '--exe' in sys.argv:
+		subprocess.check_call([INKSCAPE_EXE])
+	else:
+		inkscape_python()
+
+if __name__=='__main__':
 	if not os.path.isfile(INKSCAPE_EXE) or '--rebuild' in sys.argv:
 		build()
 	if not os.path.isdir('/usr/local/share/inkscape'):
@@ -398,7 +446,8 @@ if __name__=='__main__':
 		os.system(cmd)
 
 	ensure_user_config()
-	if '--exe' in sys.argv:
-		subprocess.check_call([INKSCAPE_EXE])
+
+	if gi and '--no-frontend-ui' not in sys.argv:
+		run_frontend()
 	else:
-		inkscape_python()
+		run_inkscape()
