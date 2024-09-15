@@ -301,6 +301,18 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 			if len(gpsvg.data.layers) < 100:
 				make_cube_grease_rig( gpsvg, cube_layers )
 
+			## restore offsets
+			for jfile in JSONS:
+				print('restore offsets:', jfile)
+				d = json.loads(open(jfile).read())
+				print(d)
+				for cu in bpy.data.objects:
+					if cu.name in d:
+						dd = d[cu.name]
+						if 'x' in dd: cu.location.x = dd['x']
+						if 'y' in dd: cu.location.y = dd['y']
+						if 'rz' in dd: cu.rotation_euler.z = dd['rz']
+
 
 		elif rects and gpstrokes:
 			bpy.ops.object.empty_add(type="ARROWS")
@@ -811,6 +823,7 @@ def safename(n):
 		n = n.replace(c,'_')
 	return n
 
+JSONS = []
 if __name__ == "__main__":
 	run_blender = False
 	kras = []
@@ -824,6 +837,8 @@ if __name__ == "__main__":
 			kras.append(arg)
 		elif arg.endswith('.svg'):
 			svgs.append(arg)
+		elif arg.endswith('.json'):
+			JSONS.append(arg)
 		elif arg=='--blender':
 			run_blender=True
 		elif arg=='--strip':
@@ -853,8 +868,10 @@ if __name__ == "__main__":
 		sys.exit()
 	elif run_blender:
 		cmd = ['blender', '--python', __file__]
-		if kras: cmd += ['--'] + kras
-		elif svgs: cmd += ['--'] + svgs
+		if kras or svgs or JSONS: cmd.append('--')
+		if kras: cmd += kras
+		if svgs: cmd += svgs
+		if JSONS: cmd += JSONS
 		print(cmd)
 		subprocess.check_call(cmd)
 	elif svgs:
