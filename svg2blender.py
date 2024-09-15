@@ -8,7 +8,7 @@ except:
 	bpy = None
 
 SCRIPTS = []
-GameSim = {'eyes':[], 'heads':[]}
+GameSim = {'eyes':[], 'heads':[], 'bots':[]}
 
 def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 	svg = xml.dom.minidom.parseString(open(src).read())
@@ -233,6 +233,7 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 			else:
 				depth_faker( ob )
 			gpsvg = ob
+			gpsvg.hide_select=True
 			if len(gpsvg.data.layers)==1:
 				assert len(gpsvg.data.layers[0].frames)==1
 				gpstrokes = gpsvg.data.layers[0].frames[0].strokes
@@ -282,8 +283,9 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 					mod.width = rad * 0.01
 					mod.segments = 2
 
-				mod = ob.modifiers.new(name='extrude',type="SOLIDIFY")
+				mod = ob.modifiers.new(name='__DEPTH__',type="SOLIDIFY")
 				mod.thickness = r['width'] * 0.02
+				ob['__DEPTH__'] = mod.thickness
 
 				clr = r['color']
 				if clr and clr.startswith('#'):
@@ -312,6 +314,8 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 						if 'x' in dd: cu.location.x = dd['x']
 						if 'y' in dd: cu.location.y = dd['y']
 						if 'rz' in dd: cu.rotation_euler.z = dd['rz']
+						if 'depth' in dd:
+							cu.modifiers['__DEPTH__'].thickness = dd['depth']
 
 
 		elif rects and gpstrokes:
@@ -432,9 +436,11 @@ def make_cube_grease_rig( gpsvg, cube_layers ):
 	root_cube = next
 	head_cube = None
 	leg_cubes = []
+	pivs = []
 
 	bpy.ops.object.empty_add(type="CIRCLE")
 	root = bpy.context.active_object
+	GameSim['bots'].append({'root':root, 'leg_roots':pivs, 'jump':0.0})
 	next.parent = root
 	delta = next.location - root.location
 	next.location = [0,0,0]
@@ -465,7 +471,6 @@ def make_cube_grease_rig( gpsvg, cube_layers ):
 	if head_cube:
 		head_cube['__TYPE__']='HEAD'
 
-	pivs = []
 	for leg in leg_cubes:
 		leg['__TYPE__'] = 'LEG'
 		bpy.ops.object.empty_add(type="CIRCLE", location=leg.location)
@@ -501,6 +506,9 @@ def make_cube_grease_rig( gpsvg, cube_layers ):
 				#o.matrix_parent_inverse = o.matrix_world @ parent_inverse_world_matrix
 				o.matrix_parent_inverse = parent_inverse_world_matrix
 				break
+
+	for piv in pivs:
+		piv.parent = root_cube
 
 	print('head parts:', head_parts)
 	if head_cube and head_parts:
@@ -1042,6 +1050,85 @@ class KritaWorldPanel(bpy.types.Panel):
 	def draw(self, context):
 		self.layout.operator("svg2blender.import_kra")
 
+def on_up_arrow(evt):
+	ob = bpy.context.active_object
+	if not ob: return
+	ob.location.y += 0.1
+def on_down_arrow(evt):
+	ob = bpy.context.active_object
+	if not ob: return
+	ob.location.y -= 0.1
+def on_left_arrow(evt):
+	ob = bpy.context.active_object
+	if not ob: return
+	ob.rotation_euler.z += 0.1
+	if ob.rotation_euler.z > math.pi/2:
+		ob.rotation_euler.z = math.pi / 2
+def on_right_arrow(evt):
+	ob = bpy.context.active_object
+	if not ob: return
+	ob.rotation_euler.z -= 0.1
+	if ob.rotation_euler.z < -math.pi/2:
+		ob.rotation_euler.z = -math.pi / 2
+def on_home(evt):
+	ob = bpy.context.active_object
+	if not ob: return
+	ob.rotation_euler.z = 0
+def on_page_up(evt):
+	ob = bpy.context.active_object
+	if not ob and not ob.type=='MESH': return
+	if not '__DEPTH__' in ob.modifiers: return
+	ob.modifiers['__DEPTH__'].thickness += 0.1
+def on_page_down(evt):
+	ob = bpy.context.active_object
+	if not ob and not ob.type=='MESH': return
+	if not '__DEPTH__' in ob.modifiers: return
+	ob.modifiers['__DEPTH__'].thickness -= 0.1
+
+def on_a(evt):
+	if not GameSim['bots']: return
+	bot = GameSim['bots'][0]
+	bot['root'].location.x -= 0.2
+	if bot['leg_roots']:
+		for o in bot['leg_roots']:
+			o.rotation_euler.y = uniform(-0.4,0.4)
+
+def on_d(evt):
+	if not GameSim['bots']: return
+	bot = GameSim['bots'][0]
+	bot['root'].location.x += 0.2
+	if bot['leg_roots']:
+		for o in bot['leg_roots']:
+			o.rotation_euler.y = uniform(-0.4,0.4)
+
+def on_w(evt):
+	if not GameSim['bots']: return
+	bot = GameSim['bots'][0]
+	bot['root'].location.y += 0.2
+	if bot['leg_roots']:
+		bot['jump'] += 0.1
+		for o in bot['leg_roots']:
+			o.rotation_euler.x = uniform(-0.4,0.4)
+
+def on_s(evt):
+	if not GameSim['bots']: return
+	bot = GameSim['bots'][0]
+	bot['root'].location.y -= 0.2
+	if bot['leg_roots']:
+		bot['jump'] += 0.1
+		for o in bot['leg_roots']:
+			o.rotation_euler.x = uniform(-0.4,0.4)
+
+GameSim['hotkeys'] = {
+	'A': on_a, 'W':on_w, 'S':on_s, 'D':on_d,
+	'UP_ARROW' : on_up_arrow,
+	'DOWN_ARROW' : on_down_arrow,
+	'LEFT_ARROW' : on_left_arrow,
+	'RIGHT_ARROW' : on_right_arrow,
+	'HOME': on_home,
+	'PAGE_UP' : on_page_up,
+	'PAGE_DOWN' : on_page_down,
+}
 
 _lazy_loads = {}
 _timer = None
@@ -1052,7 +1139,10 @@ class Svg2BlenderOperator(bpy.types.Operator):
 	bl_label = "svg2blender_run"
 	bl_options = {'REGISTER'}
 	def modal(self, context, event):
-		if event.type == "TIMER":
+		if event.type in GameSim['hotkeys']:
+			GameSim['hotkeys'][event.type](event)
+			return {'RUNNING_MODAL'}
+		elif event.type == "TIMER":
 			for o in bpy.data.objects:
 				if 'KRITA' in o.keys():
 					kra = o['KRITA']
@@ -1068,6 +1158,12 @@ class Svg2BlenderOperator(bpy.types.Operator):
 				scope  = s['scope']
 				script = s['script'].as_string()
 				exec(script, scope, scope)
+
+			for bot in GameSim['bots']:
+				if bot['jump']:
+					bot['root'].location.z += bot['jump']
+					bot['jump'] *= 0.5
+				bot['root'].location.z *= 0.7
 
 			for eye in GameSim['eyes']:
 				if random() < 0.1:
@@ -1108,6 +1204,9 @@ def on_blend_save(blend):
 				d['x'] = ob.location.x
 			if ob['__RZ__'] != ob.rotation_euler.z:
 				d['rz'] = ob.rotation_euler.z
+			if '__DEPTH__' in ob.modifiers:
+				if ob['depth'] != ob.modifiers['__DEPTH__'].thickness:
+					d['depth'] = ob.modifiers['__DEPTH__'].thickness
 			if d:
 				dump[ob.name]=d
 
