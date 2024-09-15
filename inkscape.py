@@ -368,8 +368,25 @@ class SaveHelper(Gtk.Window):
 		self.close()
 		Gtk.main_quit()
 
+def view_ink3d(ink3d):
+	import pickle
+	d = pickle.loads(open(ink3d,'rb').read())
+	tmp = "/tmp/__inkviewer__.svg"
+	open(tmp,'w').write(d['svg'])
+	tmpj = '/tmp/__inkviewer__.json'
+	open(tmpj,'w').write( json.dumps(d['changes']) )
+	svg2blender = os.path.join(_thisdir,'svg2blender.py')
+	cmd = ['python3', svg2blender, tmp, '--blender', tmpj]
+	print(cmd)
+	subprocess.check_call(cmd)
+
 
 if __name__=='__main__':
+	for arg in sys.argv:
+		if arg.endswith('.ink3d'):
+			view_ink3d(arg)
+			sys.exit()
+
 	if not os.path.isfile(INKSCAPE_EXE) or '--rebuild' in sys.argv:
 		build()
 	if not os.path.isdir('/usr/local/share/inkscape'):
