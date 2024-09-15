@@ -256,7 +256,7 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 				bpy.ops.mesh.primitive_plane_add(location=(ax,ay,az))
 				ob = bpy.context.active_object
 				ob.name = glayer.info
-				#ob.lock_location[0]=True
+				ob.lock_location[0]=True  ## this is saved in the json, but its locked here because it is advanced use
 				ob.lock_location[2]=True
 				ob.lock_rotation[0]=True
 				ob.lock_rotation[1]=True
@@ -380,6 +380,20 @@ def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 
 	return bobs
 
+
+
+def calc_near(object, objects):
+	nob = None
+	ndist = float('inf')
+	v = object.location
+	for ob in objects:
+		dist = (v-ob.location).length
+		if dist < ndist:
+			nob = ob
+			ndist = dist
+	return nob
+
+
 def calc_near_object(x,y,z, objects):
 	nob = None
 	ndist = float('inf')
@@ -426,6 +440,7 @@ def make_cube_grease_rig( gpsvg, cube_layers ):
 	next.location = [0,0,0]
 
 	lower_body = []
+	head_parts = []
 	while next:
 		nn = next_cube(next)
 		if nn:
@@ -435,8 +450,11 @@ def make_cube_grease_rig( gpsvg, cube_layers ):
 			#	nn.parent = root_cube
 			#else:
 			#	nn.parent = next
-			if not head_cube and nn.location.z > 0.1:
-				head_cube = nn
+			if nn.location.z > 0.1:
+				if not head_cube:
+					head_cube = nn
+				else:
+					head_parts.append(nn)
 			elif len(leg_cubes) < 2 and nn.location.z < -0.1:
 				if nn.dimensions.x < nn.dimensions.z / 3:
 					leg_cubes.append(nn)
@@ -484,11 +502,53 @@ def make_cube_grease_rig( gpsvg, cube_layers ):
 				o.matrix_parent_inverse = parent_inverse_world_matrix
 				break
 
+	print('head parts:', head_parts)
+	if head_cube and head_parts:
+		## try to find the neck
+		neck = calc_near(root_cube, head_parts)
+		if not calc_overlap(head_cube, neck):
+			print('looks like a neck:', neck)
+			neck['__TYPE__']='NECK'
+			head_parts.remove(neck)
+
+			bpy.context.evaluated_depsgraph_get().update()
+			head_cube.parent = neck
+			head_cube.matrix_parent_inverse = neck.matrix_world.inverted()
+
+		else:
+			neck = None
+		
+		parent = head_cube
+		for o in head_parts:
+			print('head part:', o)
+			bpy.context.evaluated_depsgraph_get().update()
+			parent_inverse_world_matrix = parent.matrix_world.inverted()
+			o.parent = parent
+			o.matrix_parent_inverse = parent_inverse_world_matrix
+
+
 	for i in cube_layers:
 		o = cube_layers[i]['cube']
 		o['__X__'] = o.location.x
 		o['__Y__'] = o.location.y
 		o['__RZ__'] = o.rotation_euler.z
+
+
+def calc_overlap(obj1, obj2):
+	dim1 = obj1.dimensions
+	loc1 = obj1.location
+	dim2 = obj2.dimensions
+	loc2 = obj2.location
+	min1 = loc1 - dim1 / 2
+	max1 = loc1 + dim1 / 2
+	min2 = loc2 - dim2 / 2
+	max2 = loc2 + dim2 / 2
+	if (min1.x <= max2.x and max1.x >= min2.x and
+		min1.y <= max2.y and max1.y >= min2.y and
+		min1.z <= max2.z and max1.z >= min2.z):
+		return True
+	else:
+		return False
 
 def make_grease_layers(ob):
 	mlayers = {
