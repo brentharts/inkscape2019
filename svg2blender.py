@@ -8,7 +8,7 @@ except:
 	bpy = None
 
 SCRIPTS = []
-
+GameSim = {'eyes':[], 'heads':[]}
 
 def parse_svg(src, gscripts, x=0, y=0, kra_fname=''):
 	svg = xml.dom.minidom.parseString(open(src).read())
@@ -518,6 +518,9 @@ def make_cube_grease_rig( gpsvg, cube_layers ):
 		else:
 			neck = None
 		
+		eyes = []
+		ears = []
+		head_parts_upper = []
 		parent = head_cube
 		for o in head_parts:
 			print('head part:', o)
@@ -525,6 +528,32 @@ def make_cube_grease_rig( gpsvg, cube_layers ):
 			parent_inverse_world_matrix = parent.matrix_world.inverted()
 			o.parent = parent
 			o.matrix_parent_inverse = parent_inverse_world_matrix
+			bpy.context.evaluated_depsgraph_get().update()
+			if  o.location.z - parent.location.z  > 0.01:
+				head_parts_upper.append(o)
+			if 'eye' in o.name.lower():
+				eyes.append(o)
+			elif 'eye' in o.name.lower():
+				ears.append(o)
+
+		if not eyes and not ears:
+			## try to find the eyes in the first few rects
+			for idx, o in enumerate(head_parts_upper):
+				if idx >= 6: break
+				print('head part upper:', o)
+				if abs( o.dimensions.z - head_cube.dimensions.z ) < 0.2 and len(ears) < 2:
+					if o.dimensions.x < o.dimensions.z:
+						o['__TYPE__']='EAR'
+						print('EAR',o)
+						ears.append(o)
+				elif abs( o.dimensions.x - head_cube.dimensions.x ) < 0.5 and len(eyes) < 2:
+					o['__TYPE__']='EYE'
+					print('EYE', o)
+					eyes.append(o)
+					GameSim['eyes'].append(o)
+
+		if eyes and ears:
+			GameSim['heads'].append(head_cube)
 
 
 	for i in cube_layers:
@@ -1039,6 +1068,17 @@ class Svg2BlenderOperator(bpy.types.Operator):
 				scope  = s['scope']
 				script = s['script'].as_string()
 				exec(script, scope, scope)
+
+			for eye in GameSim['eyes']:
+				if random() < 0.1:
+					eye.scale.z = random() * 0.05
+				else:
+					eye.scale.z = 1.0
+
+			for head in GameSim['heads']:
+				if random() < 0.05:
+					head.rotation_euler.y = uniform(-0.1,0.1)
+
 		return {'PASS_THROUGH'} # will not supress event bubbles
 
 	def invoke (self, context, event):
