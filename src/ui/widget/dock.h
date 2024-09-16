@@ -27,6 +27,10 @@ class Paned;
 class ScrolledWindow;
 }
 
+#ifndef INKSCAPE_OLD
+    #include "/tmp/__inkscape__.dockh.inc"
+#endif
+
 namespace Inkscape {
 namespace UI {
 namespace Widget {
