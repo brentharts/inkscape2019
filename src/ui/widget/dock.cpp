@@ -72,6 +72,9 @@ Dock::Dock(Gtk::Orientation orientation)
 #endif
 
     _filler.set_name("DockBoxFiller");
+    #ifndef INKSCAPE_OLD
+        #include "/tmp/__inkscape__.dock.inc"
+    #endif
 
     _paned = Gtk::manage(new Gtk::Paned(orientation));
     _paned->set_name("DockBoxPane");
