@@ -37,6 +37,11 @@ def build(use_swatches=False):
 	open('/tmp/__inkscape__.toolbar.inc','w').write(INKSCAPE_TOOLBAR)
 	open('/tmp/__inkscape__.header.inc','w').write(INKSCAPE_HEADER)
 	open('/tmp/__inkscape__.exit.inc','w').write(INKSCAPE_EXIT)
+
+	open('/tmp/__inkscape__.dock.inc','w').write(INKSCAPE_DOCK)
+	open('/tmp/__inkscape__.dockh.inc','w').write(INKSCAPE_DOCKH)
+	open('/tmp/__inkscape__.dockh.public.inc','w').write(INKSCAPE_DOCKH_PUBLIC)
+
 	if use_swatches:
 		open('/tmp/__inkscape__.swatch.inc','w').write(INKSCAPE_SWATCH)
 	else:
@@ -87,6 +92,18 @@ def ensure_user_config( minimal=True, menu=True ):
 		os.unlink(os.path.join(iui, 'toolbar-tool.ui'))
 
 	atexit.register(cleanup)
+
+INKSCAPE_DOCK = '''
+	auto lab = new Gtk::Label();
+	lab->set_label("my custom dock");
+	_filler.pack_start( *lab );
+'''
+
+INKSCAPE_DOCKH = '''
+#include <gtkmm/label.h>
+'''
+
+INKSCAPE_DOCKH_PUBLIC = ''
 
 #dtw->_panels = new Inkscape::UI::Dialog::SwatchesPanel("/embedded/swatches");
 #dtw->_panels->set_vexpand(false);
