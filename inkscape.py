@@ -103,15 +103,16 @@ INKSCAPE_DOCK = '''
 	_filler.pack_start( *this->blender_preview_image );
 
 	Glib::signal_timeout().connect([&]()->bool{
+		if (__inkstate__ < 0) return false;
 		if (file_exists("/tmp/__ink3d__.png")) {
 			this->blender_preview_image->set("/tmp/__ink3d__.png");
 			remove("/tmp/__ink3d__.png");
 		} else {
-			std::cout << "File /tmp/__ink3d__.png does not exist." << std::endl;
+			//std::cout << "File /tmp/__ink3d__.png does not exist." << std::endl;
 			__inkstate__=2;
 		}
 		return true;
-	}, 5000);
+	}, 1000);
 '''
 
 INKSCAPE_DOCKH = '''
@@ -295,7 +296,9 @@ def get_inkscape_includes():
 		]
 	return cmd
 
+RENDER_PROC = None
 def inkscape_python( force_rebuild=True ):
+	global RENDER_PROC
 	so  = '/tmp/libinkscape.so'
 	tmp = '/tmp/libinkscape.c++'
 	open(tmp,'w').write(INKSCAPE_MODULE)
@@ -371,13 +374,21 @@ def inkscape_python( force_rebuild=True ):
 				print('clean exit Gtk.main')
 
 		elif status == 2:
-			lib.inkscape_save_temp()
-			tmp = "/tmp/__inkscape__.svg"
-			if svg_is_updated(tmp):
-				svg2blender = os.path.join(_thisdir,'svg2blender.py')
-				cmd = ['python3', svg2blender, tmp, '--blender', '--render', '/tmp/__ink3d__.png']
-				print(cmd)
-				subprocess.check_call(cmd)
+			if RENDER_PROC:
+				print(RENDER_PROC)
+				if RENDER_PROC.poll() is None:
+					print('waiting...')
+				else:
+					print('done')
+					RENDER_PROC = None
+			else:
+				lib.inkscape_save_temp()
+				tmp = "/tmp/__inkscape__.svg"
+				if svg_is_updated(tmp):
+					svg2blender = os.path.join(_thisdir,'svg2blender.py')
+					cmd = ['python3', svg2blender, tmp, '--blender', '--render', '/tmp/__ink3d__.png']
+					print(cmd)
+					RENDER_PROC=subprocess.Popen(cmd)
 
 _PREV_HASH = None
 def svg_is_updated(f):
