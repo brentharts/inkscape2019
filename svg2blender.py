@@ -1003,8 +1003,10 @@ def safename(n):
 	return n
 
 JSONS = []
+REN_OUTPUT = None
 if __name__ == "__main__":
 	run_blender = False
+	blender_ren = False
 	kras = []
 	svgs = []
 	output = None
@@ -1012,6 +1014,8 @@ if __name__ == "__main__":
 	for arg in sys.argv:
 		if arg.startswith('--output='):
 			output = arg.split('=')[-1]
+		elif arg.startswith('--ren-out='):
+			REN_OUTPUT = arg.split('=')[-1]
 		elif arg.endswith('.kra'):
 			kras.append(arg)
 		elif arg.endswith('.svg'):
@@ -1022,6 +1026,8 @@ if __name__ == "__main__":
 			run_blender=True
 		elif arg=='--strip':
 			do_strip = True
+		elif arg=='--render':
+			blender_ren = True
 
 	if do_strip:
 		if not output:
@@ -1046,11 +1052,16 @@ if __name__ == "__main__":
 		kraout.close()
 		sys.exit()
 	elif run_blender:
-		cmd = ['blender', '--python', __file__]
-		if kras or svgs or JSONS: cmd.append('--')
+		cmd = ['blender']
+		if blender_ren: cmd.append('--background')
+		cmd += ['--python', __file__]
+		if kras or svgs or JSONS or blender_ren: cmd.append('--')
 		if kras: cmd += kras
 		if svgs: cmd += svgs
 		if JSONS: cmd += JSONS
+		if blender_ren:
+			assert sys.argv[-1].endswith('.png')
+			cmd.append('--ren-out=%s' % sys.argv[-1])
 		print(cmd)
 		subprocess.check_call(cmd)
 	elif svgs:
@@ -1265,10 +1276,23 @@ def on_blend_save(blend):
 	print('json dump:', dump)
 	open('/tmp/__inkscape__.json','w').write(json.dumps(dump))
 
+def ink3d_render(out):
+	bpy.context.scene.render.film_transparent = True
+	bpy.context.scene.render.image_settings.color_mode = 'RGBA'
+	bpy.context.scene.render.filepath=out
+	bpy.context.scene.render.resolution_x = 512
+	bpy.context.scene.render.resolution_y = 512
+	bpy.ops.render.render(animation=False, write_still=True)
+
 if __name__=='__main__':
 	bpy.context.preferences.view.show_splash = False
 	bpy.ops.wm.save_as_mainfile(filepath="/tmp/__inkscape__.blend")
 	bpy.app.handlers.save_post.append(on_blend_save)
 	if 'Cube' in bpy.data.objects:
 		bpy.data.objects['Cube'].hide_set(True)
-	bpy.ops.svg2blender.run()
+		bpy.data.objects['Cube'].hide_render=True
+	if REN_OUTPUT:
+		print('headless mode')
+		ink3d_render(REN_OUTPUT)
+	else:
+		bpy.ops.svg2blender.run()
