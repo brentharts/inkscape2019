@@ -93,17 +93,59 @@ def ensure_user_config( minimal=True, menu=True ):
 
 	atexit.register(cleanup)
 
+'''
+			Gdk::Pixbuf pbuf("/tmp/__ink3d__.png");
+			this->blender_preview_image->set_pixbuf(pbuf);
+
+			Glib::File::status_type status = Glib::File::query_exists("/tmp/__ink3d__.png");
+			if (status == Glib::File::EXISTS) {
+				Gdk::Pixbuf pbuf("/tmp/__ink3d__.png");
+				this->blender_preview_image->set_pixbuf(pbuf);
+			} else {
+				std::cout << "File /tmp/__ink3d__.png does not exist." << std::endl;
+			}
+			return true; // Keep the timer running
+
+
+'''
+
 INKSCAPE_DOCK = '''
+	this->blender_preview_image = new Gtk::Image();
 	auto lab = new Gtk::Label();
 	lab->set_label("my custom dock");
 	_filler.pack_start( *lab );
+	_filler.pack_start( *this->blender_preview_image );
+
+	Glib::signal_timeout().connect([&]()->bool{
+		std::cout << "check blender render preview" << std::endl;
+
+		if (file_exists("/tmp/__ink3d__.png")) {
+			//Gdk::Pixbuf pbuf("/tmp/__ink3d__.png");
+			//this->blender_preview_image->set_pixbuf(pbuf);
+		} else {
+			std::cout << "File /tmp/__ink3d__.png does not exist." << std::endl;
+		}
+
+		return true;
+	}, 5000);
 '''
 
 INKSCAPE_DOCKH = '''
 #include <gtkmm/label.h>
+#include <gtkmm/image.h>
+#include <glibmm/timer.h>
+#include <glibmm.h>
+
+#include <sys/stat.h>
+static bool file_exists(const std::string& filename) {
+	struct stat buffer;
+	return (stat(filename.c_str(), &buffer) == 0);
+}
 '''
 
-INKSCAPE_DOCKH_PUBLIC = ''
+INKSCAPE_DOCKH_PUBLIC = '''
+	Gtk::Image *blender_preview_image;
+'''
 
 #dtw->_panels = new Inkscape::UI::Dialog::SwatchesPanel("/embedded/swatches");
 #dtw->_panels->set_vexpand(false);
