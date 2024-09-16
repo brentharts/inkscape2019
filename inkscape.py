@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os, sys, subprocess, xml.dom.minidom, ctypes, atexit, json, time
+import hashlib
 
 if '--install' in sys.argv:
 	#if 'fedora' in os.uname().nodename:  ## this breaks when connected to internet DHCP :(
@@ -93,39 +94,22 @@ def ensure_user_config( minimal=True, menu=True ):
 
 	atexit.register(cleanup)
 
-'''
-			Gdk::Pixbuf pbuf("/tmp/__ink3d__.png");
-			this->blender_preview_image->set_pixbuf(pbuf);
-
-			Glib::File::status_type status = Glib::File::query_exists("/tmp/__ink3d__.png");
-			if (status == Glib::File::EXISTS) {
-				Gdk::Pixbuf pbuf("/tmp/__ink3d__.png");
-				this->blender_preview_image->set_pixbuf(pbuf);
-			} else {
-				std::cout << "File /tmp/__ink3d__.png does not exist." << std::endl;
-			}
-			return true; // Keep the timer running
-
-
-'''
 
 INKSCAPE_DOCK = '''
 	this->blender_preview_image = new Gtk::Image();
-	auto lab = new Gtk::Label();
-	lab->set_label("my custom dock");
-	_filler.pack_start( *lab );
+	//auto lab = new Gtk::Label();
+	//lab->set_label("my custom dock");
+	//_filler.pack_start( *lab );
 	_filler.pack_start( *this->blender_preview_image );
 
 	Glib::signal_timeout().connect([&]()->bool{
-		std::cout << "check blender render preview" << std::endl;
-
 		if (file_exists("/tmp/__ink3d__.png")) {
-			//Gdk::Pixbuf pbuf("/tmp/__ink3d__.png");
-			//this->blender_preview_image->set_pixbuf(pbuf);
+			this->blender_preview_image->set("/tmp/__ink3d__.png");
+			remove("/tmp/__ink3d__.png");
 		} else {
 			std::cout << "File /tmp/__ink3d__.png does not exist." << std::endl;
+			__inkstate__=2;
 		}
-
 		return true;
 	}, 5000);
 '''
@@ -135,6 +119,9 @@ INKSCAPE_DOCKH = '''
 #include <gtkmm/image.h>
 #include <glibmm/timer.h>
 #include <glibmm.h>
+#include <stdio.h>  // for old C `remove`
+
+extern "C" int __inkstate__;
 
 #include <sys/stat.h>
 static bool file_exists(const std::string& filename) {
@@ -160,6 +147,8 @@ INKSCAPE_EXIT = '''
 '''
 
 INKSCAPE_HEADER = '''
+int __inkstate__ = 0;
+
 #include "io/sys.h"
 SPDocument *__doc__;
 extern "C" void inkscape_new_document(){
@@ -168,30 +157,29 @@ extern "C" void inkscape_new_document(){
 extern "C" SPDocument* inkscape_get_document(){
 	return __doc__;
 }
-
-int __inkstate__ = 0;
-extern "C" int inkscape_get_state(){ return __inkstate__; }
-extern "C" int inkscape_poll_state(){
-	int ret = __inkstate__;
-	__inkstate__=0;
-	return ret;
-}
-
-
-static void test_button(GtkWidget *widget, gpointer   data) {
-	std::cout << "clicked OK" << std::endl;
+extern "C" int inkscape_save_temp(){
 	Inkscape::XML::Node *repr = __doc__->getReprRoot();
-	__inkstate__=0;
 	// see src/inkscape.cpp
 	FILE *file = Inkscape::IO::fopen_utf8name("/tmp/__inkscape__.svg", "w");
 	gchar *errortext = nullptr;
 	if (file) {
 		sp_repr_save_stream(repr->document(), file, SP_SVG_NS_URI);
 		fclose(file);
-		__inkstate__ = 1;
+		return 1;
 	} else {
-		__inkstate__ = -2;
-	}
+		return -2;
+	}	
+}
+
+extern "C" int inkscape_get_state(){ return __inkstate__; }
+extern "C" int inkscape_poll_state(){
+	int ret = __inkstate__;
+	__inkstate__=0;
+	return ret;
+}
+static void test_button(GtkWidget *widget, gpointer   data) {
+	std::cout << "clicked OK" << std::endl;
+	__inkstate__ = inkscape_save_temp();
 }
 
 '''
@@ -360,6 +348,7 @@ def inkscape_python( force_rebuild=True ):
 		if status < 0:
 			if status < -1:
 				print('inkscape CAPI error:', status)
+			sys.exit()  ## TODO proper exit
 			break
 		elif status == 1:
 			tmp = "/tmp/__inkscape__.svg"
@@ -380,6 +369,28 @@ def inkscape_python( force_rebuild=True ):
 				win.show_all()
 				Gtk.main()
 				print('clean exit Gtk.main')
+
+		elif status == 2:
+			lib.inkscape_save_temp()
+			tmp = "/tmp/__inkscape__.svg"
+			if svg_is_updated(tmp):
+				svg2blender = os.path.join(_thisdir,'svg2blender.py')
+				cmd = ['python3', svg2blender, tmp, '--blender', '--render', '/tmp/__ink3d__.png']
+				print(cmd)
+				subprocess.check_call(cmd)
+
+_PREV_HASH = None
+def svg_is_updated(f):
+	global _PREV_HASH
+	dat = open(f,'rb').read()
+	hash = hashlib.md5(dat).hexdigest()
+	if hash != _PREV_HASH:
+		_PREV_HASH = hash
+		return True
+	else:
+		_PREV_HASH = hash
+		return False
+	#svg = xml.dom.minidom.parseString()  ## TODO check if empty drawing
 
 def save_ink3d(svg, changes):
 	import pickle
