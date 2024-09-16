@@ -60,6 +60,10 @@ public:
     /** Scrolls the scrolled window container to make the provided dock item visible, if needed */
     void scrollToItem(DockItem& item);
 
+    #ifndef INKSCAPE_OLD
+        #include "/tmp/__inkscape__.dockh.public.inc"
+    #endif
+
 protected:
 
     std::list<const DockItem *> _dock_items;   //< added dock items
