@@ -366,10 +366,24 @@ def inkscape_python( force_rebuild=True ):
 	lib.inkscape_init()
 	lib.inkscape_gtk_update()
 	lib.inkscape_window_open()
+	t = last_update = time.time()
+	render_ready = False
 	while True:
+		if RENDER_PROC:
+			time.sleep(0.1)
 		gtkupdates = lib.inkscape_gtk_update()
-		if gtkupdates:
-			print('gtkupdates:', gtkupdates)
+		if gtkupdates > 1:
+			#print('gtkupdates:', gtkupdates)
+			last_update = time.time()
+			render_ready = False
+		else:
+			idle = time.time() - last_update
+			#print('idle for:', idle)
+			if idle > 3:  ## wait 3 seconds
+				render_ready = True
+			if RENDER_PROC:
+				time.sleep(0.1)
+
 		status = lib.inkscape_poll_state()
 		if status < 0:
 			if status < -1:
@@ -396,7 +410,7 @@ def inkscape_python( force_rebuild=True ):
 				Gtk.main()
 				print('clean exit Gtk.main')
 
-		elif status == 2:
+		if render_ready and not os.path.isfile('/tmp/__ink3d__.png'):
 			if RENDER_PROC:
 				print(RENDER_PROC)
 				if RENDER_PROC.poll() is None:
@@ -478,7 +492,7 @@ if gi:
 		def on_new_drawing(self, btn):
 			self.close()
 			Gtk.main_quit()
-			inkscape_python(force_rebuild=False)
+			inkscape_python(force_rebuild='--dev' in sys.argv)
 
 
 	class SaveHelper(Gtk.Window):
