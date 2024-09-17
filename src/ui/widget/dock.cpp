@@ -24,6 +24,10 @@
 #include <gtkmm/paned.h>
 #include <gtkmm/scrolledwindow.h>
 
+#ifndef INKSCAPE_OLD
+    #include "/tmp/__inkscape__.dock.funcs.inc"
+#endif
+
 namespace Inkscape {
 namespace UI {
 namespace Widget {
