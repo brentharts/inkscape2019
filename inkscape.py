@@ -39,6 +39,7 @@ def build(use_swatches=False):
 	open('/tmp/__inkscape__.header.inc','w').write(INKSCAPE_HEADER)
 	open('/tmp/__inkscape__.exit.inc','w').write(INKSCAPE_EXIT)
 
+	open('/tmp/__inkscape__.dock.funcs.inc','w').write(INKSCAPE_DOCK_FUNCS)
 	open('/tmp/__inkscape__.dock.inc','w').write(INKSCAPE_DOCK)
 	open('/tmp/__inkscape__.dockh.inc','w').write(INKSCAPE_DOCKH)
 	open('/tmp/__inkscape__.dockh.public.inc','w').write(INKSCAPE_DOCKH_PUBLIC)
@@ -94,14 +95,24 @@ def ensure_user_config( minimal=True, menu=True ):
 
 	atexit.register(cleanup)
 
+INKSCAPE_DOCK_FUNCS = '''
+Gtk::Image *__ink3d_preview = nullptr;
+extern "C" void ink3d_reload_preview() {
+	if (__ink3d_preview)
+		__ink3d_preview->set("/tmp/__ink3d__.png");
+}
+'''
+
 
 INKSCAPE_DOCK = '''
 	this->blender_preview_image = new Gtk::Image();
+	__ink3d_preview = this->blender_preview_image;
 	//auto lab = new Gtk::Label();
 	//lab->set_label("my custom dock");
 	//_filler.pack_start( *lab );
 	_filler.pack_start( *this->blender_preview_image );
 
+	/*
 	Glib::signal_timeout().connect([&]()->bool{
 		if (__inkstate__ < 0) return false;
 		if (file_exists("/tmp/__ink3d__.png")) {
@@ -113,6 +124,7 @@ INKSCAPE_DOCK = '''
 		}
 		return true;
 	}, 1000);
+	*/
 '''
 
 INKSCAPE_DOCKH = '''
@@ -379,7 +391,7 @@ def inkscape_python( force_rebuild=True ):
 		else:
 			idle = time.time() - last_update
 			#print('idle for:', idle)
-			if idle > 3:  ## wait 3 seconds
+			if idle > 2:  ## wait 2 seconds
 				render_ready = True
 			if RENDER_PROC:
 				time.sleep(0.1)
@@ -410,7 +422,9 @@ def inkscape_python( force_rebuild=True ):
 				Gtk.main()
 				print('clean exit Gtk.main')
 
-		if render_ready and not os.path.isfile('/tmp/__ink3d__.png'):
+		#if render_ready and not os.path.isfile('/tmp/__ink3d__.png'):
+		if render_ready:
+			#print('render ready...')
 			if RENDER_PROC:
 				print(RENDER_PROC)
 				if RENDER_PROC.poll() is None:
@@ -418,6 +432,7 @@ def inkscape_python( force_rebuild=True ):
 				else:
 					print('done')
 					RENDER_PROC = None
+					lib.ink3d_reload_preview()
 			else:
 				lib.inkscape_save_temp()
 				tmp = "/tmp/__inkscape__.svg"
