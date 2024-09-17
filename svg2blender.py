@@ -1276,7 +1276,14 @@ def on_blend_save(blend):
 	print('json dump:', dump)
 	open('/tmp/__inkscape__.json','w').write(json.dumps(dump))
 
-def ink3d_render(out):
+def ink3d_render(out, fast=True, pixelated=True):
+	if fast:
+		bpy.context.scene.eevee.taa_samples = 1
+		bpy.context.scene.eevee.taa_render_samples = 1
+		bpy.context.scene.eevee.use_taa_reprojection = False
+	if pixelated:
+		bpy.context.scene.grease_pencil_settings.antialias_threshold = 0.0
+
 	bpy.context.scene.render.film_transparent = True
 	bpy.context.scene.render.image_settings.color_mode = 'RGBA'
 	bpy.context.scene.render.filepath=out
