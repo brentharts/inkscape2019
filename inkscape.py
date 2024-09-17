@@ -241,10 +241,31 @@ extern "C" void inkscape_window_open(){
 }
 
 
-extern "C" void inkscape_gtk_update(){
-	while (gtk_events_pending()) gtk_main_iteration();
+extern "C" int inkscape_gtk_update(){
+	int updates = 0;
+	while (g_main_pending()) {
+		g_main_context_iteration(NULL, FALSE);
+		updates ++;
+	}
+	return updates;
 }
 '''
+
+#/usr/include/glib-2.0/glib/deprecated/gmain.h:110:78: error: expected primary-expression before ‘)’ token
+#  110 | #define g_main_iteration(may_block) g_main_context_iteration (NULL, may_block) GLIB_DEPRECATED_MACRO_IN_2_26_FOR(g_main_context_iteration)
+
+
+## https://stackoverflow.com/questions/21271484/gtk-events-pending-returns-false-with-events-still-pending
+#extern "C" int inkscape_gtk_update(){
+#	int updates = 0;
+#	while (gtk_events_pending()) { // just calling this updates events if required?
+#		//gtk_main_iteration(); // so calling this is not even needed?
+#		updates ++;
+#	}
+#	if (updates) std::cout << "c++ can see updates:" << updates << std::endl;
+#	return updates;
+#}
+
 
 
 def get_inkscape_includes():
@@ -346,7 +367,9 @@ def inkscape_python( force_rebuild=True ):
 	lib.inkscape_gtk_update()
 	lib.inkscape_window_open()
 	while True:
-		lib.inkscape_gtk_update()
+		gtkupdates = lib.inkscape_gtk_update()
+		if gtkupdates:
+			print('gtkupdates:', gtkupdates)
 		status = lib.inkscape_poll_state()
 		if status < 0:
 			if status < -1:
