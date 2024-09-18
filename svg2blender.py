@@ -1081,6 +1081,15 @@ if not bpy: sys.exit()
 from bpy_extras.io_utils import ImportHelper
 import mathutils
 
+
+@bpy.utils.register_class
+class Ink3dBlender(bpy.types.Operator):
+	bl_idname = 'svg2blender.render_svg'
+	bl_label  = 'Render SVG (.svg)'
+	def execute(self, context):
+		render_svg()
+		return {'FINISHED'}
+
 @bpy.utils.register_class
 class Inkscape4Blender(bpy.types.Operator, ImportHelper):
 	bl_idname = 'svg2blender.import_svg'
@@ -1101,14 +1110,16 @@ class Krita4Blender(bpy.types.Operator, ImportHelper):
 		return {'FINISHED'}
 
 @bpy.utils.register_class
-class KritaWorldPanel(bpy.types.Panel):
-	bl_idname = "WORLD_PT_KritaWorld_Panel"
-	bl_label = "Krita"
+class Ink3dWorldPanel(bpy.types.Panel):
+	bl_idname = "WORLD_PT_Ink3dWorld_Panel"
+	bl_label = "Ink3D"
 	bl_space_type = "PROPERTIES"
 	bl_region_type = "WINDOW"
 	bl_context = "world"
 	def draw(self, context):
 		self.layout.operator("svg2blender.import_kra")
+		self.layout.operator("svg2blender.import_svg")
+		self.layout.operator("svg2blender.render_svg")
 
 def on_up_arrow(evt):
 	ob = bpy.context.active_object
@@ -1290,6 +1301,36 @@ def ink3d_render(out, fast=True, pixelated=True):
 	bpy.context.scene.render.resolution_x = 512
 	bpy.context.scene.render.resolution_y = 512
 	bpy.ops.render.render(animation=False, write_still=True)
+
+def render_svg(out='/tmp/__b2svg__.svg', debug=1):
+	for ob in bpy.data.objects:
+		if not ob.type=='GPENCIL': continue
+		bpy.ops.object.select_all(action='DESELECT')
+		ob.select_set(True)
+		bpy.context.view_layer.objects.active = ob
+		tmp = '/tmp/__%s__.svg' % ob.name
+		bpy.ops.wm.gpencil_export_svg(
+			filepath=tmp, use_fill=True, stroke_sample=1, check_existing=False,
+			use_normalized_thickness=False, selected_object_type='ACTIVE',
+		)
+		os.system('cat %s' % tmp)
+		svg = open(tmp).read()
+		assert '<?xml?>' in svg
+		## eye-of-gnome says: XML parse error: Error domain 1 code 64 on line 3
+		## data: XML declaration allowed only at the start of the document
+		if debug > 1:
+			open(tmp,'w').write(svg.split('<?xml?>')[-1])
+			os.system('eog %s' % tmp)
+
+		svg = xml.dom.minidom.parseString(svg.split('<?xml?>')[-1])
+		for elt in svg.getElementsByTagName('polyline'):
+			sw = float( elt.getAttribute('stroke-width') )
+			sw *= 0.05
+			elt.setAttribute('stroke-width', str(sw) )
+
+		open(tmp,'w').write(svg.toprettyxml())
+		if debug:
+			os.system('eog %s' % tmp)
 
 if __name__=='__main__':
 	bpy.context.preferences.view.show_splash = False
