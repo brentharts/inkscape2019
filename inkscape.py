@@ -35,8 +35,8 @@ VOID:STRING,STRING
 '''
 
 def build(use_swatches=False):
-	open('/tmp/__inkscape__.toolbar.inc','w').write(INKSCAPE_TOOLBAR)
-	open('/tmp/__inkscape__.header.inc','w').write(INKSCAPE_HEADER)
+	open('/tmp/__inkscape__.toolbar.inc','w').write(get_toolbar())
+	open('/tmp/__inkscape__.header.inc','w').write(get_toolbar_header())
 	open('/tmp/__inkscape__.exit.inc','w').write(INKSCAPE_EXIT)
 
 	open('/tmp/__inkscape__.dock.funcs.inc','w').write(INKSCAPE_DOCK_FUNCS)
@@ -207,6 +207,13 @@ static void on_click_blender_export(GtkWidget *widget, gpointer data) {
 
 '''
 
+def get_toolbar_header():
+	o = [INKSCAPE_HEADER]
+	for plug in PLUGINS:
+		if 'toolbar_funcs' in plug:
+			o.append(plug['toolbar_funcs'])
+	return '\n'.join(o)
+
 INKSCAPE_TOOLBAR = '''
 	auto grid = gtk_grid_new();
 	{
@@ -215,16 +222,25 @@ INKSCAPE_TOOLBAR = '''
 		g_signal_connect(btn, "clicked", G_CALLBACK(on_click_blender_preview), NULL);
 	}
 	{
-		auto btn = gtk_button_new_with_label("export");
+		auto btn = gtk_button_new_with_label("💾 .blend");
 		gtk_grid_attach(GTK_GRID(grid), btn, 0, 1, 1, 1);
 		g_signal_connect(btn, "clicked", G_CALLBACK(on_click_blender_export), NULL);
 	}
 
-	gtk_grid_attach(GTK_GRID(grid), dtw->tool_toolbox, 0, 2, 1, 1);
-	dtw->_hbox->pack_start(*Glib::wrap(grid), false, true);
 
 
 '''
+
+def get_toolbar():
+	o = [INKSCAPE_TOOLBAR]
+	for plug in PLUGINS:
+		if 'toolbar' in plug:
+			o.append(plug['toolbar'])
+	o += [
+		'gtk_grid_attach(GTK_GRID(grid), dtw->tool_toolbox, 0, 2, 1, 1);',
+		'dtw->_hbox->pack_start(*Glib::wrap(grid), false, true);',
+	]
+	return '\n'.join(o)
 
 #SPDocument *SPDocument::createNewDoc(gchar const *document_uri, bool keepalive, bool make_new, SPDocument *parent)
 
@@ -332,6 +348,7 @@ def get_inkscape_includes():
 		]
 	return cmd
 
+PLUGIN_EVENTS = {}
 RENDER_PROC = None
 def inkscape_python( force_rebuild=True, load=None ):
 	global RENDER_PROC
@@ -422,6 +439,9 @@ def inkscape_python( force_rebuild=True, load=None ):
 			Gtk.main()
 			print('clean exit Gtk.main')
 
+		elif status in PLUGIN_EVENTS:
+			PLUGIN_EVENTS[status]()
+
 		elif render_ready:
 			#print('render ready...')
 			if RENDER_PROC:
@@ -440,6 +460,14 @@ def inkscape_python( force_rebuild=True, load=None ):
 					cmd = ['python3', svg2blender, tmp, '--blender', '--render', '/tmp/__ink3d__.png']
 					print(cmd)
 					RENDER_PROC=subprocess.Popen(cmd)
+
+def ink2blend():
+	tmp = "/tmp/__inkscape__.svg"
+	svg2blender = os.path.join(_thisdir,'svg2blender.py')
+	cmd = ['python3', svg2blender, tmp, '--blender', '--export']
+	print(cmd)
+	subprocess.check_call(cmd)
+	return "/tmp/__inkscape__.blend"
 
 _PREV_HASH = None
 def svg_is_updated(f):
@@ -612,10 +640,18 @@ def run_inkscape():
 	else:
 		inkscape_python()
 SVGS = []
+PLUGINS = []
 if __name__=='__main__':
 	for arg in sys.argv:
 		if arg.endswith('.svg'):
 			SVGS.append(arg)
+		elif arg.endswith('.plugink'):
+			plugink = json.loads( open(arg).read() )
+			PLUGINS.append(plugink)
+			if 'python' in plugink:
+				print('plugin setup code:')
+				print(plugink['python'])
+				exec(plugink['python'])
 
 	if not os.path.isfile(INKSCAPE_EXE) or '--rebuild' in sys.argv:
 		build()
