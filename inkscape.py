@@ -190,25 +190,33 @@ extern "C" int inkscape_poll_state(){
 	__inkstate__=0;
 	return ret;
 }
-static void test_button(GtkWidget *widget, gpointer   data) {
+static void on_click_blender_preview(GtkWidget *widget, gpointer data) {
 	std::cout << "clicked OK" << std::endl;
 	__inkstate__ = inkscape_save_temp();
+}
+static void on_click_blender_export(GtkWidget *widget, gpointer data) {
+	std::cout << "clicked OK" << std::endl;
+	inkscape_save_temp();
+	__inkstate__ = 3;
 }
 
 '''
 
 INKSCAPE_TOOLBAR = '''
-        //auto split = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
-        auto grid = gtk_grid_new();
-        //auto btn = gtk_widget_new(GTK_TYPE_BUTTON, "hi");//new Gtk::Button();
-        auto btn = gtk_button_new_with_label("blender");
-        //btn->set_label("hello");
-        //split->pack_start(*btn);
-        //split->pack_start(*Glib::wrap(dtw->tool_toolbox), false, true);
-        gtk_grid_attach(GTK_GRID(grid), btn, 0, 0, 1, 1);
-        gtk_grid_attach(GTK_GRID(grid), dtw->tool_toolbox, 0, 1, 1, 1);
-        dtw->_hbox->pack_start(*Glib::wrap(grid), false, true);
-        g_signal_connect(btn, "clicked", G_CALLBACK(test_button), NULL);
+	auto grid = gtk_grid_new();
+	{
+		auto btn = gtk_button_new_with_label("blender");
+		gtk_grid_attach(GTK_GRID(grid), btn, 0, 0, 1, 1);
+		g_signal_connect(btn, "clicked", G_CALLBACK(on_click_blender_preview), NULL);
+	}
+	{
+		auto btn = gtk_button_new_with_label("export");
+		gtk_grid_attach(GTK_GRID(grid), btn, 0, 1, 1, 1);
+		g_signal_connect(btn, "clicked", G_CALLBACK(on_click_blender_export), NULL);
+	}
+
+	gtk_grid_attach(GTK_GRID(grid), dtw->tool_toolbox, 0, 2, 1, 1);
+	dtw->_hbox->pack_start(*Glib::wrap(grid), false, true);
 
 
 '''
@@ -422,8 +430,18 @@ def inkscape_python( force_rebuild=True ):
 				Gtk.main()
 				print('clean exit Gtk.main')
 
-		#if render_ready and not os.path.isfile('/tmp/__ink3d__.png'):
-		if render_ready:
+		elif status == 3:
+			tmp = "/tmp/__inkscape__.svg"
+			svg2blender = os.path.join(_thisdir,'svg2blender.py')
+			cmd = ['python3', svg2blender, tmp, '--blender', '--export']
+			print(cmd)
+			subprocess.check_call(cmd)
+			win = ExportHelper("/tmp/__inkscape__.blend")
+			win.show_all()
+			Gtk.main()
+			print('clean exit Gtk.main')
+
+		elif render_ready:
 			#print('render ready...')
 			if RENDER_PROC:
 				print(RENDER_PROC)
@@ -540,6 +558,39 @@ if gi:
 			if not path.endswith('.ink3d'): path += '.ink3d'
 			print('saving path:', path)
 			open(path, 'wb').write(pickle.dumps(self.dump))
+			button.set_label('SAVED OK')
+			self.close()
+			Gtk.main_quit()
+
+	class ExportHelper(Gtk.Window):
+		def __init__(self, dump):
+			super().__init__(title="Export Blender File")
+			self.dump = dump
+			self.set_default_size(380, 200)
+			vbox = Gtk.VBox(spacing=6)
+			self.add(vbox)
+			label = Gtk.Label(label="Project Folder:")
+			vbox.pack_start(label, False, False, 0)
+			self.entry_prj = Gtk.Entry()
+			self.entry_prj.set_text(os.path.expanduser('~/Documents'))
+			vbox.pack_start(self.entry_prj, False, False, 0)
+
+			label = Gtk.Label(label="Blend File Name:")
+			vbox.pack_start(label, False, False, 0)
+			self.entry_file = Gtk.Entry()
+			self.entry_file.set_text('%s.blend' % time.time())
+			vbox.pack_start(self.entry_file, False, False, 0)
+
+			button = Gtk.Button(label="Save")
+			button.connect("clicked", self.on_click)
+			vbox.pack_start(button, False, False, 0)
+			self.connect("destroy", Gtk.main_quit)
+
+		def on_click(self, button):
+			path = os.path.join( self.entry_prj.get_text(), self.entry_file.get_text() )
+			if not path.endswith('.blend'): path += '.blend'
+			print('saving path:', path)
+			open(path, 'wb').write( open(self.dump,'rb').read() )
 			button.set_label('SAVED OK')
 			self.close()
 			Gtk.main_quit()
