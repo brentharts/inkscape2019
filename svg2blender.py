@@ -1007,6 +1007,7 @@ REN_OUTPUT = None
 if __name__ == "__main__":
 	run_blender = False
 	blender_ren = False
+	do_export   = False
 	kras = []
 	svgs = []
 	output = None
@@ -1024,6 +1025,8 @@ if __name__ == "__main__":
 			JSONS.append(arg)
 		elif arg=='--blender':
 			run_blender=True
+		elif arg=='--export':
+			do_export=True
 		elif arg=='--strip':
 			do_strip = True
 		elif arg=='--render':
@@ -1053,7 +1056,7 @@ if __name__ == "__main__":
 		sys.exit()
 	elif run_blender:
 		cmd = ['blender']
-		if blender_ren: cmd.append('--background')
+		if blender_ren or do_export: cmd.append('--background')
 		cmd += ['--python', __file__]
 		if kras or svgs or JSONS or blender_ren: cmd.append('--')
 		if kras: cmd += kras
@@ -1415,6 +1418,7 @@ if __name__=='__main__':
 		print('headless mode')
 		ink3d_render(REN_OUTPUT)
 	else:
-		bpy.ops.svg2blender.run()
+		if not bpy.app.background:
+			bpy.ops.svg2blender.run()
 		if '--test-svg-render' in sys.argv:
 			bpy.ops.svg2blender.render_svg()
