@@ -1302,16 +1302,30 @@ def ink3d_render(out, fast=True, pixelated=True):
 	bpy.context.scene.render.resolution_y = 512
 	bpy.ops.render.render(animation=False, write_still=True)
 
-def render_svg(out='/tmp/__b2svg__.svg', debug=1):
+def render_svg(out='/tmp/__b2svg__.svg', debug=0):
+	doc = xml.dom.minidom.Document()
+	svgtop = doc.createElement('svg')
+
+	bpy.ops.object.gpencil_add(type="LINEART_SCENE")
+	prev_width = prev_height = None
+	eyes = []
+	blinks = None
+	for ob in bpy.data.objects:
+		if '__TYPE__' in ob.keys():
+			if ob['__TYPE__']=='EYE':
+				eyes.append(ob.name)
+
 	for ob in bpy.data.objects:
 		if not ob.type=='GPENCIL': continue
 		bpy.ops.object.select_all(action='DESELECT')
 		ob.select_set(True)
 		bpy.context.view_layer.objects.active = ob
 		tmp = '/tmp/__%s__.svg' % ob.name
+		print(bpy.ops.wm.gpencil_export_svg.__doc__)
 		bpy.ops.wm.gpencil_export_svg(
 			filepath=tmp, use_fill=True, stroke_sample=1, check_existing=False,
 			use_normalized_thickness=False, selected_object_type='ACTIVE',
+			use_clip_camera=True,
 		)
 		os.system('cat %s' % tmp)
 		svg = open(tmp).read()
@@ -1323,6 +1337,13 @@ def render_svg(out='/tmp/__b2svg__.svg', debug=1):
 			os.system('eog %s' % tmp)
 
 		svg = xml.dom.minidom.parseString(svg.split('<?xml?>')[-1])
+		width = svg.documentElement.getAttribute('width')
+		height = svg.documentElement.getAttribute('height')
+		if width.endswith('px'): width = width[:-2]
+		if height.endswith('px'): height = height[:-2]
+		width = int(width)
+		height = int(height)
+
 		for elt in svg.getElementsByTagName('polyline'):
 			sw = float( elt.getAttribute('stroke-width') )
 			sw *= 0.05
@@ -1331,6 +1352,57 @@ def render_svg(out='/tmp/__b2svg__.svg', debug=1):
 		open(tmp,'w').write(svg.toprettyxml())
 		if debug:
 			os.system('eog %s' % tmp)
+
+		if prev_height != None:
+			delta = prev_height - height
+			svg.documentElement.setAttribute('y', '%spx' % delta)
+
+		prev_height = height
+		prev_width  = width
+
+		if eyes:
+			rem = []
+			for ename in eyes:
+				#e = svg.getElementById(ename)  ## TODO what is wrong here?
+				e = getElementById(svg, ename)
+				if e:
+					rem.append(ename)
+					blinks = svg_anim_blink( svg, e, blinks )
+			for ename in rem:
+				eyes.remove(ename)
+
+		g = doc.createElement('g')
+		svgtop.appendChild(g)
+		for child in svg.childNodes:
+			g.appendChild(child)
+
+	open(out, 'w').write(svgtop.toprettyxml())
+
+
+def svg_anim_blink(doc, elt, blinks=None):
+	if blinks is None:
+		blinks = []
+		for i in range(30):
+			if random() < 0.1:
+				blinks.append('0')
+			else:
+				blinks.append('1')
+	a = doc.createElement('animate')
+	a.setAttribute('attributeType', 'XML')
+	a.setAttribute('attributeName', 'opacity')
+	a.setAttribute('values', ';'.join(blinks))
+	a.setAttribute('begin', '0s')
+	a.setAttribute('dur', '1s')
+	a.setAttribute('calcMode', 'discrete')
+	a.setAttribute('repeatCount', 'indefinite')
+	elt.appendChild(a)
+	return blinks
+
+def getElementById(doc, name):
+	for g in doc.getElementsByTagName('g'):
+		if g.getAttribute('id')==name:
+			return g
+
 
 if __name__=='__main__':
 	bpy.context.preferences.view.show_splash = False
@@ -1344,3 +1416,5 @@ if __name__=='__main__':
 		ink3d_render(REN_OUTPUT)
 	else:
 		bpy.ops.svg2blender.run()
+		if '--test-svg-render' in sys.argv:
+			bpy.ops.svg2blender.render_svg()
