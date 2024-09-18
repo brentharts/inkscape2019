@@ -170,6 +170,11 @@ extern "C" void inkscape_new_document(){
 extern "C" SPDocument* inkscape_get_document(){
 	return __doc__;
 }
+
+extern "C" void inkscape_new_document_mem(const char *ptr, int len){
+	__doc__ = SPDocument::createNewDocFromMem(ptr, len, true);
+}
+
 extern "C" int inkscape_save_temp(){
 	Inkscape::XML::Node *repr = __doc__->getReprRoot();
 	// see src/inkscape.cpp
@@ -223,11 +228,6 @@ INKSCAPE_TOOLBAR = '''
 
 #SPDocument *SPDocument::createNewDoc(gchar const *document_uri, bool keepalive, bool make_new, SPDocument *parent)
 
-INKSCAPE_MODULE_PRE = '''
-#include "document.h"
-SPDocument *__doc__ = nullptr;
-
-'''
 
 INKSCAPE_MODULE = '''
 #include "inkscape-application.h"
@@ -236,30 +236,25 @@ INKSCAPE_MODULE = '''
 extern "C" void inkscape_new_document();
 extern "C" SPDocument* inkscape_get_document();
 
-
 ConcreteInkscapeApplication<Gtk::Application> *app;
 InkscapeWindow *win;
-SPDocument *__doc__ = nullptr;
 
 extern "C" void inkscape_init(){
 	std::cout << "inkscape_init()" << std::endl;
-	//app = ConcreteInkscapeApplication<Gtk::Application>::get_instance_pointer();
+	//app = ConcreteInkscapeApplication<Gtk::Application>::get_instance_pointer();  //TODO remove
 	app = &(ConcreteInkscapeApplication<Gtk::Application>::get_instance());
 	std::cout << app << std::endl;
 	Inkscape::Application::create(true);
 }
+
 extern "C" void inkscape_window_open(){
-	std::cout << "new SPDoc" << std::endl;
-	//__doc__ = SPDocument::createNewDoc(nullptr, true, true, nullptr);
-	// CAPI
-	inkscape_new_document();
-	__doc__ = inkscape_get_document();
+	auto __doc__ = inkscape_get_document();
+	std::cout << "SPDoc pointer:" << __doc__ << std::endl;
 	app->document_add(__doc__);
 	std::cout << "window_open" << std::endl;
 	win = app->window_open(__doc__);
 	std::cout << "window_open OK" << std::endl;
 }
-
 
 extern "C" int inkscape_gtk_update(){
 	int updates = 0;
@@ -338,7 +333,7 @@ def get_inkscape_includes():
 	return cmd
 
 RENDER_PROC = None
-def inkscape_python( force_rebuild=True ):
+def inkscape_python( force_rebuild=True, load=None ):
 	global RENDER_PROC
 	so  = '/tmp/libinkscape.so'
 	tmp = '/tmp/libinkscape.c++'
@@ -356,26 +351,6 @@ def inkscape_python( force_rebuild=True ):
 		print(cmd)
 		subprocess.check_call(cmd)
 
-
-	if False:
-		tmp = '/tmp/libinkscape.pre.c++'
-		sopre = '/tmp/libinkscape.pre.so'
-		open(tmp,'w').write(INKSCAPE_MODULE_PRE)
-		cmd = [
-			'g++', 
-			'-shared', '-fPIC',
-			'-o', sopre, tmp, 
-			#'-L', os.path.join(_buildir,'lib'),
-			#'-l', 'inkscape_base',   ## this is actually: libinkscape_base.so
-			#'-l', 'gtk-3',
-		] + get_inkscape_includes()
-		print(cmd)
-		subprocess.check_call(cmd)
-
-		print('loading:', sopre)
-		libsopre = ctypes.CDLL(sopre)  ## must be loaded first
-		print(libsopre._doc_)
-
 	print('loading:', INKSCAPE_SO)
 	libase = ctypes.CDLL(INKSCAPE_SO)  ## must be loaded first
 	print(libase)
@@ -385,6 +360,12 @@ def inkscape_python( force_rebuild=True ):
 	print(lib.inkscape_init)
 	lib.inkscape_init()
 	lib.inkscape_gtk_update()
+	if load:
+		a = open(load,'rb').read()
+		lib.inkscape_new_document_mem.argtypes = [ctypes.c_char_p, ctypes.c_int]
+		lib.inkscape_new_document_mem(a, len(a))
+	else:
+		lib.inkscape_new_document()
 	lib.inkscape_window_open()
 	t = last_update = time.time()
 	render_ready = False
@@ -508,19 +489,32 @@ if gi:
 			self.add(vbox)
 			btn = Gtk.Button(label='New Drawing')
 			btn.connect("clicked", self.on_new_drawing)
-
 			vbox.pack_start(btn, False, False, 0)
-			for file in os.listdir(self.project_dir):
-				if file.endswith('.ink3d'):
-					pth = os.path.join(self.project_dir,file)
+
+			if SVGS:
+				for pth in SVGS:
 					btn = Gtk.Button(label=pth)
 					vbox.pack_start(btn, False, False, 0)
-					btn.connect("clicked", lambda b, f=pth:self.on_open(f))
+					btn.connect("clicked", lambda b, f=pth:self.on_open_svg(f))
+
+			else:
+
+				for file in os.listdir(self.project_dir):
+					if file.endswith('.ink3d'):
+						pth = os.path.join(self.project_dir,file)
+						btn = Gtk.Button(label=pth)
+						vbox.pack_start(btn, False, False, 0)
+						btn.connect("clicked", lambda b, f=pth:self.on_open(f))
 
 			self.connect("destroy", Gtk.main_quit)
 
 		def on_open(self, file):
 			view_ink3d(file)
+
+		def on_open_svg(self, file):
+			self.close()
+			Gtk.main_quit()
+			inkscape_python(force_rebuild='--dev' in sys.argv, load=file)
 
 		def on_new_drawing(self, btn):
 			self.close()
@@ -617,8 +611,12 @@ def run_inkscape():
 		subprocess.check_call([INKSCAPE_EXE])
 	else:
 		inkscape_python()
-
+SVGS = []
 if __name__=='__main__':
+	for arg in sys.argv:
+		if arg.endswith('.svg'):
+			SVGS.append(arg)
+
 	if not os.path.isfile(INKSCAPE_EXE) or '--rebuild' in sys.argv:
 		build()
 	if not os.path.isdir('/usr/local/share/inkscape'):
